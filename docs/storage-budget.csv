@@ -1,0 +1,10 @@
+Profile,Interval_Minutes,Sessions_Per_Day,Estimated_MB_Per_Session,Estimated_GB_Per_Day,Estimated_GB_Per_30_Days,Usable_512GB_After_20pct_Reserve_GB,Estimated_Retention_Days,Notes
+JPEG_Previews,10,144,12,1.728,51.84,409.6,237,"Two approximately 6MB previews"
+JPEG_Previews,15,96,12,1.152,34.56,409.6,356,"Baseline preview-only profile"
+JPEG_Previews,30,48,12,0.576,17.28,409.6,711,"Metadata is negligible in this estimate"
+Previews_Plus_DNG,10,144,60,8.64,259.2,409.6,47,"Representative two previews plus two raw files"
+Previews_Plus_DNG,15,96,60,5.76,172.8,409.6,71,"Baseline scientific-capable planning profile"
+Previews_Plus_DNG,30,48,60,2.88,86.4,409.6,142,"Measure actual DNG sizes"
+Large_Diagnostic,10,144,100,14.4,432,409.6,28,"Fails 30-day retention target on 512GB"
+Large_Diagnostic,15,96,100,9.6,288,409.6,43,"Use for upper-bound planning"
+Large_Diagnostic,30,48,100,4.8,144,409.6,85,"Raw retries and logs require additional reserve"

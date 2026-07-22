@@ -1,0 +1,190 @@
+{
+  "schema_version": "1.0.0",
+  "capture_id": "019b45ce-7d40-7000-8000-000000000017",
+  "device": {
+    "device_id": "device-017",
+    "unit_serial": "AIOT-EVT-017",
+    "hardware_revision": "EVT-A",
+    "firmware_version": "0.1.0",
+    "os_image_version": "2026.07-pilot.1",
+    "boot_id": "5b45d7c1-7f42-49ab-9357-13d2cda5fa64",
+    "uptime_s": 18234.5
+  },
+  "time": {
+    "scheduled_at": "2026-07-22T10:30:00.000Z",
+    "triggered_at": "2026-07-22T10:30:00.114Z",
+    "monotonic_ns": 18234500114000,
+    "source": "gnss_pps",
+    "synchronized": true,
+    "uncertainty_ms": 2.5,
+    "rgb_nir_delta_ms": 412.3
+  },
+  "location": {
+    "installation_latitude_deg": 12.9716,
+    "installation_longitude_deg": 77.5946,
+    "installation_altitude_m": 920.0,
+    "altitude_reference": "mean_sea_level",
+    "live_latitude_deg": 12.97161,
+    "live_longitude_deg": 77.59459,
+    "live_altitude_m": 921.2,
+    "fix_type": "3d",
+    "horizontal_accuracy_m": 2.8,
+    "fix_age_s": 0.4
+  },
+  "capture": {
+    "interval_minutes": 15,
+    "mode": "sequential",
+    "profile_id": "overcast",
+    "complete": true,
+    "partial_reasons": [],
+    "retry_count": 0
+  },
+  "images": [
+    {
+      "asset_id": "asset-rgb-preview",
+      "role": "rgb_preview",
+      "camera_id": "rgb-cam-01",
+      "filename": "rgb_preview.jpg",
+      "media_type": "image/jpeg",
+      "width_px": 4608,
+      "height_px": 2592,
+      "byte_size": 6034921,
+      "sha256": "a90b5d88b47c153c178abb22963625bfb8e5aa35ec13e188ac61f568eb766f01",
+      "captured_at": "2026-07-22T10:30:00.304Z",
+      "sensor_timestamp_ns": 18234690114000,
+      "exposure_us": 4000.0,
+      "analogue_gain": 1.0,
+      "colour_gains": [
+        1.75,
+        1.55
+      ],
+      "lens_position": 3.2,
+      "profile_id": "overcast",
+      "quality": {
+        "valid": true,
+        "mean_normalized": 0.42,
+        "dark_fraction": 0.02,
+        "saturated_fraction": 0.001,
+        "sharpness_score": 184.2,
+        "flags": []
+      }
+    },
+    {
+      "asset_id": "asset-nir-preview",
+      "role": "nir_preview",
+      "camera_id": "nir-cam-01",
+      "filename": "nir_preview.jpg",
+      "media_type": "image/jpeg",
+      "width_px": 4608,
+      "height_px": 2592,
+      "byte_size": 5510234,
+      "sha256": "4ef9ba7859dd34a2344558057e999104971f42d6c8d800ff34bfb6eed40de933",
+      "captured_at": "2026-07-22T10:30:00.716Z",
+      "sensor_timestamp_ns": 18235102414000,
+      "exposure_us": 8000.0,
+      "analogue_gain": 1.5,
+      "colour_gains": [
+        1.0,
+        1.0
+      ],
+      "lens_position": 3.6,
+      "profile_id": "overcast",
+      "quality": {
+        "valid": true,
+        "mean_normalized": 0.38,
+        "dark_fraction": 0.04,
+        "saturated_fraction": 0.0005,
+        "sharpness_score": 132.7,
+        "flags": []
+      }
+    }
+  ],
+  "environment": {
+    "air_temperature": {
+      "value": 24.7,
+      "unit": "degC",
+      "status": "valid",
+      "sampled_at": "2026-07-22T10:30:00.842Z",
+      "error_code": null,
+      "calibration_id": "sht45-cal-017-v1"
+    },
+    "relative_humidity": {
+      "value": 71.2,
+      "unit": "percent",
+      "status": "valid",
+      "sampled_at": "2026-07-22T10:30:00.842Z",
+      "error_code": null,
+      "calibration_id": "sht45-cal-017-v1"
+    },
+    "pressure": {
+      "value": 91320.0,
+      "unit": "Pa",
+      "status": "valid",
+      "sampled_at": "2026-07-22T10:30:00.861Z",
+      "error_code": null,
+      "calibration_id": "bmp390-cal-017-v1"
+    },
+    "illuminance": {
+      "value": 7400.0,
+      "unit": "lux",
+      "status": "valid",
+      "sampled_at": "2026-07-22T10:29:59.950Z",
+      "error_code": null,
+      "calibration_id": "veml7700-cal-017-v1"
+    }
+  },
+  "power": {
+    "input_voltage_v": 13.21,
+    "input_current_a": 0.83,
+    "input_power_w": 10.96,
+    "minimum_cycle_voltage_v": 13.08,
+    "battery_state_of_charge_percent": 84.0,
+    "battery_temperature_c": 25.1,
+    "charger_state": "float",
+    "energy_policy_state": "normal"
+  },
+  "network": {
+    "active_interface": "cellular",
+    "online": true,
+    "backend_reachable": true,
+    "metered": true,
+    "signal": {
+      "technology": "LTE",
+      "rsrp_dbm": -92.0,
+      "rsrq_db": -10.0,
+      "sinr_db": 14.0
+    }
+  },
+  "storage": {
+    "free_bytes": 401245683712,
+    "used_percent": 18.6,
+    "queue_sessions": 3,
+    "oldest_unacknowledged_age_s": 901.0
+  },
+  "health": {
+    "overall": "ok",
+    "cpu_temperature_c": 51.2,
+    "storage_temperature_c": 43.0,
+    "camera_status": {
+      "rgb": "ok",
+      "nir": "ok"
+    },
+    "sensor_status": {
+      "sht45": "ok",
+      "bmp390": "ok",
+      "veml7700": "ok",
+      "ina228": "ok",
+      "gnss": "ok"
+    },
+    "error_codes": []
+  },
+  "provenance": {
+    "configuration_sha256": "01be5e4f614cf9ed757952649a5f2ae7b7b759099815549ac7b81ad1b80e54fa",
+    "camera_pair_calibration_id": "pair-017-v1",
+    "radiometric_calibration_id": "radio-017-v1",
+    "filter_model": "BN850-equivalent",
+    "filter_lot": "LOT-2026-07-A",
+    "software_pipeline_version": "capture-pipeline-0.1.0"
+  }
+}
+

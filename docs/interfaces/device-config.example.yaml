@@ -1,0 +1,254 @@
+schema_version: "1.0.0"
+revision: 1
+device:
+  device_id: "device-017"
+  unit_serial: "AIOT-EVT-017"
+  hardware_revision: "EVT-A"
+  site_id: "site-demo-01"
+  timezone_display: "UTC"
+
+schedule:
+  interval_minutes: 15
+  align_to_utc_boundary: true
+  missed_capture_grace_seconds: 120
+  capture_timeout_seconds: 90
+  daylight:
+    mode: "lux_threshold"
+    minimum_lux: 50.0
+    diagnostic_capture_below_minimum: false
+
+cameras:
+  capture_mode: "sequential"
+  sequence: ["rgb", "nir"]
+  maximum_rgb_nir_delta_ms: 2000
+  settle_frames: 5
+  retry_count: 1
+  resolution:
+    width_px: 4608
+    height_px: 2592
+  assets:
+    jpeg_preview:
+      enabled: true
+      quality: 90
+    dng_raw:
+      rgb_enabled: true
+      nir_enabled: true
+  rgb:
+    logical_id: "rgb-cam-01"
+    libcamera_index: 0
+    expected_model: "imx708"
+    expected_serial: "TBD-RGB-SERIAL"
+    calibration_file: "/etc/aiot/calibration/rgb-cam-01.json"
+    profiles:
+      bright:
+        minimum_lux: 30000.0
+        exposure_us: 1000
+        analogue_gain: 1.0
+        colour_gains: [1.75, 1.55]
+        lens_position: 3.2
+        frame_duration_limits_us: [33333, 33333]
+      overcast:
+        minimum_lux: 3000.0
+        exposure_us: 4000
+        analogue_gain: 1.0
+        colour_gains: [1.75, 1.55]
+        lens_position: 3.2
+        frame_duration_limits_us: [33333, 33333]
+      low_light:
+        minimum_lux: 50.0
+        exposure_us: 15000
+        analogue_gain: 2.0
+        colour_gains: [1.75, 1.55]
+        lens_position: 3.2
+        frame_duration_limits_us: [33333, 33333]
+  nir:
+    logical_id: "nir-cam-01"
+    libcamera_index: 1
+    expected_model: "imx708"
+    expected_serial: "TBD-NIR-SERIAL"
+    filter:
+      model: "BN850-equivalent"
+      lot: "TBD"
+      center_wavelength_nm: 850
+      fwhm_nm: 50
+    calibration_file: "/etc/aiot/calibration/nir-cam-01.json"
+    profiles:
+      bright:
+        minimum_lux: 30000.0
+        exposure_us: 3000
+        analogue_gain: 1.0
+        colour_gains: [1.0, 1.0]
+        lens_position: 3.6
+        frame_duration_limits_us: [33333, 33333]
+      overcast:
+        minimum_lux: 3000.0
+        exposure_us: 8000
+        analogue_gain: 1.5
+        colour_gains: [1.0, 1.0]
+        lens_position: 3.6
+        frame_duration_limits_us: [33333, 33333]
+      low_light:
+        minimum_lux: 50.0
+        exposure_us: 25000
+        analogue_gain: 2.5
+        colour_gains: [1.0, 1.0]
+        lens_position: 3.6
+        frame_duration_limits_us: [40000, 40000]
+  quality:
+    maximum_saturated_fraction: 0.01
+    maximum_dark_fraction: 0.50
+    minimum_normalized_mean: 0.03
+    minimum_sharpness_score:
+      rgb: 100.0
+      nir: 75.0
+
+calibration:
+  pair_geometry_file: "/etc/aiot/calibration/camera-pair-v1.json"
+  radiometric_file: "/etc/aiot/calibration/radiometric-v1.json"
+  require_camera_identity_match: true
+
+sensors:
+  i2c_bus: 1
+  i2c_frequency_hz: 100000
+  timeout_ms: 1000
+  temperature_humidity:
+    enabled: true
+    driver: "sht45"
+    address: "0x44"
+    calibration_file: "/etc/aiot/calibration/sht45.json"
+  pressure:
+    enabled: true
+    driver: "bmp390"
+    address: "0x77"
+    calibration_file: "/etc/aiot/calibration/bmp390.json"
+  illuminance:
+    enabled: true
+    driver: "veml7700"
+    address: "0x10"
+    calibration_file: "/etc/aiot/calibration/veml7700.json"
+  power_monitor:
+    enabled: true
+    driver: "ina228"
+    address: "0x40"
+    shunt_ohms: 0.010
+    calibration_file: "/etc/aiot/calibration/ina228.json"
+  gnss:
+    enabled: true
+    driver: "ublox"
+    serial_port: "/dev/serial0"
+    baud_rate: 38400
+    pps_gpio_bcm: 18
+    maximum_fix_age_seconds: 300
+  optional_weather:
+    rain_enabled: false
+    rain_gpio_bcm: 17
+    millimeters_per_pulse: 0.2
+    wind_enabled: false
+    wind_gpio_bcm: 27
+
+location:
+  installation:
+    latitude_deg: 0.0
+    longitude_deg: 0.0
+    altitude_m: 0.0
+    altitude_reference: "mean_sea_level"
+  prefer_live_gnss: false
+
+storage:
+  queue_path: "/var/lib/aiot/queue"
+  diagnostics_path: "/var/lib/aiot/diagnostics"
+  minimum_post_ack_retention_hours: 24
+  warning_used_percent: 80
+  cleanup_used_percent: 90
+  degrade_used_percent: 95
+  critical_used_percent: 98
+  emergency_policy: "pause_capture"
+  sqlite_synchronous: "FULL"
+
+network:
+  preferred_order: ["ethernet", "wifi", "cellular"]
+  interfaces:
+    ethernet:
+      enabled: true
+      route_metric: 100
+    wifi:
+      enabled: true
+      connection_profile: "aiot-managed-wifi"
+      route_metric: 200
+      metered: false
+    cellular:
+      enabled: true
+      connection_profile: "aiot-lte"
+      route_metric: 300
+      metered: true
+      upload_raw_on_metered: false
+      modem_power_gpio_bcm: 24
+      maximum_autonomous_resets_per_day: 4
+
+api:
+  base_url: "https://ingest.example.invalid"
+  metadata_schema_version: "1.0.0"
+  auth:
+    method: "mutual_tls"
+    certificate_path: "/etc/aiot/credentials/device.crt"
+    private_key_reference: "pkcs11:object=aiot-device-key"
+    ca_bundle_path: "/etc/aiot/credentials/backend-ca.pem"
+  timeout_seconds:
+    dns: 10
+    connect: 10
+    tls: 15
+    metadata: 60
+    asset: 300
+    complete: 60
+  retry:
+    base_seconds: 5
+    maximum_seconds: 1800
+    maximum_nonretryable_attempts: 3
+  upload:
+    maximum_concurrent_sessions: 1
+    maximum_concurrent_assets: 2
+    oldest_first: true
+
+power:
+  mode: "continuous"
+  rtc_wake_enabled: false
+  heater_gpio_bcm: 25
+  thresholds:
+    energy_saving_voltage: 12.4
+    critical_voltage: 12.0
+    shutdown_voltage: 11.6
+    recovery_voltage: 12.8
+    recovery_hold_seconds: 600
+  switched_loads:
+    modem_off_during_sleep: true
+    storage_off_during_sleep: false
+    fan_off_during_sleep: true
+    heaters_off_during_sleep: true
+
+thermal:
+  camera_min_c: 0.0
+  camera_max_c: 50.0
+  warning_internal_c: 45.0
+  hot_internal_c: 50.0
+  critical_internal_c: 55.0
+  hysteresis_c: 3.0
+  condensation:
+    heater_enabled: false
+    enable_dewpoint_margin_c: 2.0
+    disable_dewpoint_margin_c: 5.0
+    maximum_on_seconds: 300
+
+health:
+  report_interval_seconds: 3600
+  service_watchdog_seconds: 60
+  hardware_watchdog_seconds: 45
+  diagnostics_retention_days: 14
+  persistent_log_max_megabytes: 256
+
+updates:
+  enabled: false
+  framework: "TBD_RAUC_OR_MENDER"
+  channel: "pilot"
+  require_external_power_or_soc_percent: 60
+  probation_minutes: 30
+

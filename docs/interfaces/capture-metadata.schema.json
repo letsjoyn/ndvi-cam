@@ -1,0 +1,732 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/aiot/capture-metadata-1.0.0.json",
+  "title": "AIoT RGB and NIR Capture Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "capture_id",
+    "device",
+    "time",
+    "location",
+    "capture",
+    "images",
+    "environment",
+    "power",
+    "network",
+    "storage",
+    "health",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "capture_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "device": {
+      "$ref": "#/$defs/device"
+    },
+    "time": {
+      "$ref": "#/$defs/time"
+    },
+    "location": {
+      "$ref": "#/$defs/location"
+    },
+    "capture": {
+      "$ref": "#/$defs/capture"
+    },
+    "images": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/imageAsset"
+      }
+    },
+    "environment": {
+      "$ref": "#/$defs/environment"
+    },
+    "power": {
+      "$ref": "#/$defs/power"
+    },
+    "network": {
+      "$ref": "#/$defs/network"
+    },
+    "storage": {
+      "$ref": "#/$defs/storage"
+    },
+    "health": {
+      "$ref": "#/$defs/health"
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    }
+  },
+  "$defs": {
+    "rfc3339": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nullableRfc3339": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/rfc3339"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "nullableNumber": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "unit",
+        "status",
+        "sampled_at"
+      ],
+      "properties": {
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "valid",
+            "stale",
+            "unavailable",
+            "out_of_range",
+            "invalid"
+          ]
+        },
+        "sampled_at": {
+          "$ref": "#/$defs/nullableRfc3339"
+        },
+        "error_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "calibration_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id",
+        "unit_serial",
+        "hardware_revision",
+        "firmware_version",
+        "os_image_version",
+        "boot_id",
+        "uptime_s"
+      ],
+      "properties": {
+        "device_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "unit_serial": {
+          "type": "string"
+        },
+        "hardware_revision": {
+          "type": "string"
+        },
+        "firmware_version": {
+          "type": "string"
+        },
+        "os_image_version": {
+          "type": "string"
+        },
+        "boot_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "uptime_s": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "time": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scheduled_at",
+        "triggered_at",
+        "monotonic_ns",
+        "source",
+        "synchronized",
+        "uncertainty_ms",
+        "rgb_nir_delta_ms"
+      ],
+      "properties": {
+        "scheduled_at": {
+          "$ref": "#/$defs/nullableRfc3339"
+        },
+        "triggered_at": {
+          "$ref": "#/$defs/nullableRfc3339"
+        },
+        "monotonic_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source": {
+          "enum": [
+            "gnss_pps",
+            "ntp",
+            "rtc",
+            "invalid"
+          ]
+        },
+        "synchronized": {
+          "type": "boolean"
+        },
+        "uncertainty_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "rgb_nir_delta_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installation_latitude_deg",
+        "installation_longitude_deg",
+        "installation_altitude_m",
+        "altitude_reference",
+        "live_latitude_deg",
+        "live_longitude_deg",
+        "live_altitude_m",
+        "fix_type",
+        "horizontal_accuracy_m",
+        "fix_age_s"
+      ],
+      "properties": {
+        "installation_latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "installation_longitude_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "installation_altitude_m": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "altitude_reference": {
+          "enum": [
+            "mean_sea_level",
+            "ellipsoid",
+            "unknown"
+          ]
+        },
+        "live_latitude_deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -90,
+          "maximum": 90
+        },
+        "live_longitude_deg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -180,
+          "maximum": 180
+        },
+        "live_altitude_m": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fix_type": {
+          "enum": [
+            "none",
+            "2d",
+            "3d",
+            "dead_reckoning",
+            "surveyed"
+          ]
+        },
+        "horizontal_accuracy_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "fix_age_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interval_minutes",
+        "mode",
+        "profile_id",
+        "complete",
+        "partial_reasons",
+        "retry_count"
+      ],
+      "properties": {
+        "interval_minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mode": {
+          "enum": [
+            "sequential",
+            "rgb_nir_rgb"
+          ]
+        },
+        "profile_id": {
+          "type": "string"
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "partial_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "imageAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_id",
+        "role",
+        "camera_id",
+        "filename",
+        "media_type",
+        "width_px",
+        "height_px",
+        "byte_size",
+        "sha256",
+        "captured_at",
+        "sensor_timestamp_ns",
+        "exposure_us",
+        "analogue_gain",
+        "colour_gains",
+        "lens_position",
+        "profile_id",
+        "quality"
+      ],
+      "properties": {
+        "asset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "rgb_preview",
+            "nir_preview",
+            "rgb_raw",
+            "nir_raw",
+            "rgb_motion_reference",
+            "diagnostic"
+          ]
+        },
+        "camera_id": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string",
+          "pattern": "^[^/\\\\]+$"
+        },
+        "media_type": {
+          "type": "string"
+        },
+        "width_px": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height_px": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "byte_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "captured_at": {
+          "$ref": "#/$defs/nullableRfc3339"
+        },
+        "sensor_timestamp_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "exposure_us": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "analogue_gain": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "colour_gains": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "lens_position": {
+          "type": "number"
+        },
+        "profile_id": {
+          "type": "string"
+        },
+        "quality": {
+          "$ref": "#/$defs/imageQuality"
+        }
+      }
+    },
+    "imageQuality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "valid",
+        "mean_normalized",
+        "dark_fraction",
+        "saturated_fraction",
+        "sharpness_score",
+        "flags"
+      ],
+      "properties": {
+        "valid": {
+          "type": "boolean"
+        },
+        "mean_normalized": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "dark_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "saturated_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "sharpness_score": {
+          "type": "number",
+          "minimum": 0
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "air_temperature",
+        "relative_humidity",
+        "pressure",
+        "illuminance"
+      ],
+      "properties": {
+        "air_temperature": {
+          "$ref": "#/$defs/measurement"
+        },
+        "relative_humidity": {
+          "$ref": "#/$defs/measurement"
+        },
+        "pressure": {
+          "$ref": "#/$defs/measurement"
+        },
+        "illuminance": {
+          "$ref": "#/$defs/measurement"
+        },
+        "rain_accumulation": {
+          "$ref": "#/$defs/measurement"
+        },
+        "wind_speed": {
+          "$ref": "#/$defs/measurement"
+        },
+        "wind_direction": {
+          "$ref": "#/$defs/measurement"
+        }
+      }
+    },
+    "power": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_voltage_v",
+        "input_current_a",
+        "input_power_w",
+        "minimum_cycle_voltage_v",
+        "battery_state_of_charge_percent",
+        "battery_temperature_c",
+        "charger_state",
+        "energy_policy_state"
+      ],
+      "properties": {
+        "input_voltage_v": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "input_current_a": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "input_power_w": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "minimum_cycle_voltage_v": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "battery_state_of_charge_percent": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "battery_temperature_c": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "charger_state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "energy_policy_state": {
+          "enum": [
+            "normal",
+            "energy_saving",
+            "critical",
+            "shutdown_pending"
+          ]
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "active_interface",
+        "online",
+        "backend_reachable",
+        "metered",
+        "signal"
+      ],
+      "properties": {
+        "active_interface": {
+          "enum": [
+            "ethernet",
+            "wifi",
+            "cellular",
+            "none"
+          ]
+        },
+        "online": {
+          "type": "boolean"
+        },
+        "backend_reachable": {
+          "type": "boolean"
+        },
+        "metered": {
+          "type": "boolean"
+        },
+        "signal": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "number",
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "free_bytes",
+        "used_percent",
+        "queue_sessions",
+        "oldest_unacknowledged_age_s"
+      ],
+      "properties": {
+        "free_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "used_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "queue_sessions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "oldest_unacknowledged_age_s": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overall",
+        "cpu_temperature_c",
+        "storage_temperature_c",
+        "camera_status",
+        "sensor_status",
+        "error_codes"
+      ],
+      "properties": {
+        "overall": {
+          "enum": [
+            "ok",
+            "degraded",
+            "critical"
+          ]
+        },
+        "cpu_temperature_c": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "storage_temperature_c": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "camera_status": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "sensor_status": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "error_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configuration_sha256",
+        "camera_pair_calibration_id",
+        "radiometric_calibration_id",
+        "filter_model",
+        "filter_lot",
+        "software_pipeline_version"
+      ],
+      "properties": {
+        "configuration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "camera_pair_calibration_id": {
+          "type": "string"
+        },
+        "radiometric_calibration_id": {
+          "type": "string"
+        },
+        "filter_model": {
+          "type": "string"
+        },
+        "filter_lot": {
+          "type": "string"
+        },
+        "software_pipeline_version": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

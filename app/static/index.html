@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#ffffff">
+    <title>FieldScope</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="FieldScope dashboard">
+          <span class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </span>
+          <span>FieldScope</span>
+        </a>
+
+        <nav class="primary-nav" aria-label="Primary navigation">
+          <button class="nav-tab is-active" type="button" data-view-target="dashboard">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Dashboard</span>
+          </button>
+          <button class="nav-tab" type="button" data-view-target="captures">
+            <i data-lucide="images"></i>
+            <span>Captures</span>
+          </button>
+          <button class="nav-tab" type="button" data-view-target="devices">
+            <i data-lucide="radio-tower"></i>
+            <span>Devices</span>
+          </button>
+          <button class="nav-tab" type="button" data-view-target="calibration">
+            <i data-lucide="scan-line"></i>
+            <span>Calibration</span>
+          </button>
+        </nav>
+
+        <div class="topbar-actions">
+          <div class="system-state" title="Backend connection">
+            <span class="status-dot" id="backend-dot"></span>
+            <span id="backend-state">Connecting</span>
+          </div>
+          <button class="icon-button" id="refresh-button" type="button" title="Refresh data">
+            <i data-lucide="refresh-cw"></i>
+          </button>
+          <button class="button button-primary" id="open-upload" type="button">
+            <i data-lucide="upload"></i>
+            <span>Upload pair</span>
+          </button>
+        </div>
+      </header>
+
+      <aside class="device-rail">
+        <div class="rail-header">
+          <div>
+            <span class="eyebrow">Deployment</span>
+            <strong>Research network</strong>
+          </div>
+          <button class="icon-button" type="button" title="Device filters">
+            <i data-lucide="sliders-horizontal"></i>
+          </button>
+        </div>
+
+        <label class="search-field">
+          <i data-lucide="search"></i>
+          <input id="device-search" type="search" placeholder="Search nodes">
+        </label>
+
+        <div class="rail-section-label">
+          <span>Nodes</span>
+          <span id="device-count">0</span>
+        </div>
+        <div class="device-list" id="device-list"></div>
+
+        <div class="rail-footer">
+          <div>
+            <span>Upload queue</span>
+            <strong id="rail-queue">0</strong>
+          </div>
+          <div class="queue-track">
+            <span id="queue-progress"></span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <section class="app-view is-active" id="view-dashboard">
+          <div class="view-heading">
+            <div>
+              <span class="eyebrow">Remote sensing</span>
+              <h1>Field operations</h1>
+            </div>
+            <div class="heading-actions">
+              <div class="date-stamp">
+                <i data-lucide="calendar-days"></i>
+                <span id="today-label"></span>
+              </div>
+              <button class="button button-secondary" type="button" data-view-target="captures">
+                Review captures
+                <i data-lucide="arrow-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="metric-grid" id="metric-grid">
+            <article class="metric-item is-loading"></article>
+            <article class="metric-item is-loading"></article>
+            <article class="metric-item is-loading"></article>
+            <article class="metric-item is-loading"></article>
+          </div>
+
+          <div class="dashboard-band analytics-band">
+            <section class="trend-section">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Phenology signal</span>
+                  <h2>NDVI trend</h2>
+                </div>
+                <div class="legend">
+                  <span><i class="legend-line"></i>Mean NDVI</span>
+                  <span><i class="legend-area"></i>Healthy canopy</span>
+                </div>
+              </div>
+              <div class="trend-chart" id="trend-chart" aria-label="NDVI trend chart"></div>
+            </section>
+
+            <section class="network-section">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Network</span>
+                  <h2>Node health</h2>
+                </div>
+                <button class="icon-button" type="button" data-view-target="devices" title="Open devices">
+                  <i data-lucide="arrow-up-right"></i>
+                </button>
+              </div>
+              <div class="health-list" id="health-list"></div>
+            </section>
+          </div>
+
+          <section class="dashboard-band latest-band">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">Newest observations</span>
+                <h2>Latest captures</h2>
+              </div>
+              <div class="section-actions">
+                <button class="icon-button view-mode is-active" type="button" title="Grid view">
+                  <i data-lucide="grid-2x2"></i>
+                </button>
+                <button class="icon-button" type="button" data-view-target="captures" title="Open capture archive">
+                  <i data-lucide="list"></i>
+                </button>
+              </div>
+            </div>
+            <div class="capture-grid" id="latest-captures"></div>
+          </section>
+        </section>
+
+        <section class="app-view" id="view-captures">
+          <div class="view-heading">
+            <div>
+              <span class="eyebrow">Observation archive</span>
+              <h1>Captures by date</h1>
+            </div>
+            <button class="button button-primary" type="button" id="open-upload-captures">
+              <i data-lucide="upload"></i>
+              Upload pair
+            </button>
+          </div>
+
+          <form class="filter-bar" id="capture-filters">
+            <label>
+              <span>From</span>
+              <input type="date" id="date-from">
+            </label>
+            <label>
+              <span>To</span>
+              <input type="date" id="date-to">
+            </label>
+            <label>
+              <span>Device</span>
+              <select id="capture-device-filter">
+                <option value="">All devices</option>
+              </select>
+            </label>
+            <label>
+              <span>State</span>
+              <select id="capture-status-filter">
+                <option value="">All states</option>
+                <option value="accepted">Accepted</option>
+              </select>
+            </label>
+            <button class="button button-secondary filter-submit" type="submit">
+              <i data-lucide="filter"></i>
+              Apply
+            </button>
+          </form>
+
+          <div class="archive-summary" id="archive-summary"></div>
+          <div class="date-groups" id="capture-archive"></div>
+        </section>
+
+        <section class="app-view" id="view-devices">
+          <div class="view-heading">
+            <div>
+              <span class="eyebrow">Connectivity</span>
+              <h1>Device network</h1>
+            </div>
+            <div class="date-stamp">
+              <i data-lucide="wifi"></i>
+              <span>Wi-Fi, Ethernet and cellular</span>
+            </div>
+          </div>
+
+          <div class="device-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Node</th>
+                  <th>Connection</th>
+                  <th>Signal</th>
+                  <th>Queue</th>
+                  <th>Storage</th>
+                  <th>Battery</th>
+                  <th>Last seen</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="device-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="app-view" id="view-calibration">
+          <div class="view-heading">
+            <div>
+              <span class="eyebrow">Capture controls</span>
+              <h1>Calibration profile</h1>
+            </div>
+            <div class="heading-actions">
+              <select class="sharp-select" id="calibration-device-select"></select>
+              <button class="button button-secondary" id="export-profile" type="button">
+                <i data-lucide="download"></i>
+                Export JSON
+              </button>
+            </div>
+          </div>
+
+          <div class="calibration-status" id="calibration-status"></div>
+
+          <div class="calibration-layout">
+            <section class="camera-profile">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Visible channel</span>
+                  <h2>RGB camera</h2>
+                </div>
+                <span class="channel-tag rgb-channel">RGB</span>
+              </div>
+              <div id="rgb-profile"></div>
+            </section>
+
+            <section class="camera-profile">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">850 nm channel</span>
+                  <h2>NIR camera</h2>
+                </div>
+                <span class="channel-tag nir-channel">NIR</span>
+              </div>
+              <div id="nir-profile"></div>
+            </section>
+          </div>
+
+          <div class="calibration-lower">
+            <section class="quality-profile">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Pre-upload validation</span>
+                  <h2>Quality gates</h2>
+                </div>
+                <i data-lucide="shield-check"></i>
+              </div>
+              <div class="gate-grid" id="quality-gates"></div>
+            </section>
+
+            <section class="connection-profile">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Device contract</span>
+                  <h2>Ingest endpoint</h2>
+                </div>
+                <i data-lucide="cloud-upload"></i>
+              </div>
+              <div id="ingest-profile"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="modal upload-modal" id="upload-dialog">
+      <form method="dialog" class="modal-frame" id="upload-form">
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow">Manual ingest</span>
+            <h2>Upload RGB + NIR pair</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="upload-dialog" title="Close">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Device</span>
+            <select name="device_id" id="upload-device" required></select>
+          </label>
+          <label class="field">
+            <span>Captured at</span>
+            <input name="captured_at" id="upload-captured-at" type="datetime-local" required>
+          </label>
+          <label class="field">
+            <span>RGB/NIR delta, ms</span>
+            <input name="sync_delta_ms" type="number" min="0" step="0.1" value="500">
+          </label>
+        </div>
+
+        <div class="file-pair">
+          <label class="file-field" id="rgb-file-field">
+            <i data-lucide="image"></i>
+            <strong>RGB image</strong>
+            <span>JPEG or PNG</span>
+            <input name="rgb" type="file" accept="image/jpeg,image/png" required>
+          </label>
+          <label class="file-field" id="nir-file-field">
+            <i data-lucide="scan"></i>
+            <strong>NIR image</strong>
+            <span>Same scene framing</span>
+            <input name="nir" type="file" accept="image/jpeg,image/png" required>
+          </label>
+        </div>
+
+        <div class="upload-checks">
+          <span><i data-lucide="check"></i>Blur validation</span>
+          <span><i data-lucide="check"></i>Aspect-ratio check</span>
+          <span><i data-lucide="check"></i>NDVI output</span>
+          <span><i data-lucide="check"></i>Cloud-ready storage</span>
+        </div>
+
+        <div class="form-error" id="upload-error" role="alert"></div>
+        <div class="modal-footer">
+          <button class="button button-quiet" type="button" data-close-dialog="upload-dialog">
+            Cancel
+          </button>
+          <button class="button button-primary" type="submit" id="upload-submit">
+            <i data-lucide="cloud-upload"></i>
+            Validate and upload
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal capture-modal" id="capture-dialog">
+      <div class="modal-frame capture-frame">
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow" id="capture-detail-site">Capture</span>
+            <h2 id="capture-detail-title">Observation</h2>
+          </div>
+          <div class="modal-header-actions">
+            <a class="button button-secondary" id="capture-download" href="#" download>
+              <i data-lucide="download"></i>
+              Download
+            </a>
+            <button class="icon-button" type="button" data-close-dialog="capture-dialog" title="Close">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="capture-detail-layout">
+          <div class="capture-viewer">
+            <div class="segmented-control" id="asset-tabs">
+              <button class="is-active" type="button" data-asset="ndvi">NDVI</button>
+              <button type="button" data-asset="rgb">RGB</button>
+              <button type="button" data-asset="nir">NIR</button>
+            </div>
+            <div class="viewer-stage">
+              <img id="capture-detail-image" alt="Selected capture asset">
+              <div class="ndvi-scale" id="ndvi-scale">
+                <span>-1.0</span>
+                <i></i>
+                <span>+1.0</span>
+              </div>
+            </div>
+          </div>
+
+          <aside class="capture-inspector" id="capture-inspector"></aside>
+        </div>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

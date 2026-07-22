@@ -1,0 +1,1162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/aiot/device-config-1.0.0.json",
+  "title": "AIoT Device Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "revision",
+    "device",
+    "schedule",
+    "cameras",
+    "calibration",
+    "sensors",
+    "location",
+    "storage",
+    "network",
+    "api",
+    "power",
+    "thermal",
+    "health",
+    "updates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "device_id",
+        "unit_serial",
+        "hardware_revision",
+        "site_id",
+        "timezone_display"
+      ],
+      "properties": {
+        "device_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "unit_serial": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "hardware_revision": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "site_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "timezone_display": {
+          "const": "UTC"
+        }
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "interval_minutes",
+        "align_to_utc_boundary",
+        "missed_capture_grace_seconds",
+        "capture_timeout_seconds",
+        "daylight"
+      ],
+      "properties": {
+        "interval_minutes": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 30
+        },
+        "align_to_utc_boundary": {
+          "type": "boolean"
+        },
+        "missed_capture_grace_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600
+        },
+        "capture_timeout_seconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 600
+        },
+        "daylight": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "minimum_lux",
+            "diagnostic_capture_below_minimum"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "always",
+                "lux_threshold",
+                "schedule"
+              ]
+            },
+            "minimum_lux": {
+              "type": "number",
+              "minimum": 0
+            },
+            "diagnostic_capture_below_minimum": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "cameras": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capture_mode",
+        "sequence",
+        "maximum_rgb_nir_delta_ms",
+        "settle_frames",
+        "retry_count",
+        "resolution",
+        "assets",
+        "rgb",
+        "nir",
+        "quality"
+      ],
+      "properties": {
+        "capture_mode": {
+          "enum": [
+            "sequential",
+            "rgb_nir_rgb"
+          ]
+        },
+        "sequence": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "enum": [
+              "rgb",
+              "nir"
+            ]
+          }
+        },
+        "maximum_rgb_nir_delta_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "settle_frames": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "resolution": {
+          "$ref": "#/$defs/resolution"
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "jpeg_preview",
+            "dng_raw"
+          ],
+          "properties": {
+            "jpeg_preview": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "enabled",
+                "quality"
+              ],
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "quality": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                }
+              }
+            },
+            "dng_raw": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rgb_enabled",
+                "nir_enabled"
+              ],
+              "properties": {
+                "rgb_enabled": {
+                  "type": "boolean"
+                },
+                "nir_enabled": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "rgb": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/camera"
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        "nir": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/camera"
+            },
+            {
+              "type": "object",
+              "required": [
+                "filter"
+              ],
+              "properties": {
+                "filter": {
+                  "$ref": "#/$defs/filter"
+                }
+              }
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        "quality": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "maximum_saturated_fraction",
+            "maximum_dark_fraction",
+            "minimum_normalized_mean",
+            "minimum_sharpness_score"
+          ],
+          "properties": {
+            "maximum_saturated_fraction": {
+              "$ref": "#/$defs/fraction"
+            },
+            "maximum_dark_fraction": {
+              "$ref": "#/$defs/fraction"
+            },
+            "minimum_normalized_mean": {
+              "$ref": "#/$defs/fraction"
+            },
+            "minimum_sharpness_score": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rgb",
+                "nir"
+              ],
+              "properties": {
+                "rgb": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "nir": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_geometry_file",
+        "radiometric_file",
+        "require_camera_identity_match"
+      ],
+      "properties": {
+        "pair_geometry_file": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "radiometric_file": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "require_camera_identity_match": {
+          "type": "boolean"
+        }
+      }
+    },
+    "sensors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "i2c_bus",
+        "i2c_frequency_hz",
+        "timeout_ms",
+        "temperature_humidity",
+        "pressure",
+        "illuminance",
+        "power_monitor",
+        "gnss",
+        "optional_weather"
+      ],
+      "properties": {
+        "i2c_bus": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "i2c_frequency_hz": {
+          "type": "integer",
+          "enum": [
+            100000,
+            400000
+          ]
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "temperature_humidity": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/i2cSensor"
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        "pressure": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/i2cSensor"
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        "illuminance": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/i2cSensor"
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        "power_monitor": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/i2cSensor"
+            },
+            {
+              "type": "object",
+              "required": [
+                "shunt_ohms"
+              ],
+              "properties": {
+                "shunt_ohms": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              }
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        "gnss": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "driver",
+            "serial_port",
+            "baud_rate",
+            "pps_gpio_bcm",
+            "maximum_fix_age_seconds"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "driver": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "serial_port": {
+              "$ref": "#/$defs/absolutePath"
+            },
+            "baud_rate": {
+              "type": "integer",
+              "minimum": 1200
+            },
+            "pps_gpio_bcm": {
+              "$ref": "#/$defs/gpio"
+            },
+            "maximum_fix_age_seconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "optional_weather": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rain_enabled",
+            "rain_gpio_bcm",
+            "millimeters_per_pulse",
+            "wind_enabled",
+            "wind_gpio_bcm"
+          ],
+          "properties": {
+            "rain_enabled": {
+              "type": "boolean"
+            },
+            "rain_gpio_bcm": {
+              "$ref": "#/$defs/gpio"
+            },
+            "millimeters_per_pulse": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "wind_enabled": {
+              "type": "boolean"
+            },
+            "wind_gpio_bcm": {
+              "$ref": "#/$defs/gpio"
+            }
+          }
+        }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installation",
+        "prefer_live_gnss"
+      ],
+      "properties": {
+        "installation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "latitude_deg",
+            "longitude_deg",
+            "altitude_m",
+            "altitude_reference"
+          ],
+          "properties": {
+            "latitude_deg": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "longitude_deg": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "altitude_m": {
+              "type": "number"
+            },
+            "altitude_reference": {
+              "enum": [
+                "mean_sea_level",
+                "ellipsoid",
+                "unknown"
+              ]
+            }
+          }
+        },
+        "prefer_live_gnss": {
+          "type": "boolean"
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "queue_path",
+        "diagnostics_path",
+        "minimum_post_ack_retention_hours",
+        "warning_used_percent",
+        "cleanup_used_percent",
+        "degrade_used_percent",
+        "critical_used_percent",
+        "emergency_policy",
+        "sqlite_synchronous"
+      ],
+      "properties": {
+        "queue_path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "diagnostics_path": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "minimum_post_ack_retention_hours": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warning_used_percent": {
+          "$ref": "#/$defs/percent"
+        },
+        "cleanup_used_percent": {
+          "$ref": "#/$defs/percent"
+        },
+        "degrade_used_percent": {
+          "$ref": "#/$defs/percent"
+        },
+        "critical_used_percent": {
+          "$ref": "#/$defs/percent"
+        },
+        "emergency_policy": {
+          "enum": [
+            "pause_capture",
+            "delete_oldest_unacknowledged",
+            "metadata_only"
+          ]
+        },
+        "sqlite_synchronous": {
+          "enum": [
+            "FULL",
+            "EXTRA"
+          ]
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preferred_order",
+        "interfaces"
+      ],
+      "properties": {
+        "preferred_order": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "ethernet",
+              "wifi",
+              "cellular"
+            ]
+          }
+        },
+        "interfaces": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ethernet",
+            "wifi",
+            "cellular"
+          ],
+          "properties": {
+            "ethernet": {
+              "$ref": "#/$defs/networkInterface"
+            },
+            "wifi": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/profiledNetworkInterface"
+                }
+              ],
+              "unevaluatedProperties": false
+            },
+            "cellular": {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/profiledNetworkInterface"
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "upload_raw_on_metered",
+                    "modem_power_gpio_bcm",
+                    "maximum_autonomous_resets_per_day"
+                  ],
+                  "properties": {
+                    "upload_raw_on_metered": {
+                      "type": "boolean"
+                    },
+                    "modem_power_gpio_bcm": {
+                      "$ref": "#/$defs/gpio"
+                    },
+                    "maximum_autonomous_resets_per_day": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 24
+                    }
+                  }
+                }
+              ],
+              "unevaluatedProperties": false
+            }
+          }
+        }
+      }
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_url",
+        "metadata_schema_version",
+        "auth",
+        "timeout_seconds",
+        "retry",
+        "upload"
+      ],
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "metadata_schema_version": {
+          "const": "1.0.0"
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "certificate_path",
+            "private_key_reference",
+            "ca_bundle_path"
+          ],
+          "properties": {
+            "method": {
+              "enum": [
+                "mutual_tls",
+                "oauth2_client_credentials"
+              ]
+            },
+            "certificate_path": {
+              "$ref": "#/$defs/absolutePath"
+            },
+            "private_key_reference": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "ca_bundle_path": {
+              "$ref": "#/$defs/absolutePath"
+            }
+          }
+        },
+        "timeout_seconds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dns",
+            "connect",
+            "tls",
+            "metadata",
+            "asset",
+            "complete"
+          ],
+          "properties": {
+            "dns": {
+              "$ref": "#/$defs/positiveInteger"
+            },
+            "connect": {
+              "$ref": "#/$defs/positiveInteger"
+            },
+            "tls": {
+              "$ref": "#/$defs/positiveInteger"
+            },
+            "metadata": {
+              "$ref": "#/$defs/positiveInteger"
+            },
+            "asset": {
+              "$ref": "#/$defs/positiveInteger"
+            },
+            "complete": {
+              "$ref": "#/$defs/positiveInteger"
+            }
+          }
+        },
+        "retry": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "base_seconds",
+            "maximum_seconds",
+            "maximum_nonretryable_attempts"
+          ],
+          "properties": {
+            "base_seconds": {
+              "$ref": "#/$defs/positiveInteger"
+            },
+            "maximum_seconds": {
+              "$ref": "#/$defs/positiveInteger"
+            },
+            "maximum_nonretryable_attempts": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "upload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "maximum_concurrent_sessions",
+            "maximum_concurrent_assets",
+            "oldest_first"
+          ],
+          "properties": {
+            "maximum_concurrent_sessions": {
+              "$ref": "#/$defs/positiveInteger"
+            },
+            "maximum_concurrent_assets": {
+              "$ref": "#/$defs/positiveInteger"
+            },
+            "oldest_first": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "power": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "rtc_wake_enabled",
+        "heater_gpio_bcm",
+        "thresholds",
+        "switched_loads"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "continuous",
+            "duty_cycled"
+          ]
+        },
+        "rtc_wake_enabled": {
+          "type": "boolean"
+        },
+        "heater_gpio_bcm": {
+          "$ref": "#/$defs/gpio"
+        },
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "energy_saving_voltage",
+            "critical_voltage",
+            "shutdown_voltage",
+            "recovery_voltage",
+            "recovery_hold_seconds"
+          ],
+          "properties": {
+            "energy_saving_voltage": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "critical_voltage": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "shutdown_voltage": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "recovery_voltage": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "recovery_hold_seconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "switched_loads": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "modem_off_during_sleep",
+            "storage_off_during_sleep",
+            "fan_off_during_sleep",
+            "heaters_off_during_sleep"
+          ],
+          "properties": {
+            "modem_off_during_sleep": {
+              "type": "boolean"
+            },
+            "storage_off_during_sleep": {
+              "type": "boolean"
+            },
+            "fan_off_during_sleep": {
+              "type": "boolean"
+            },
+            "heaters_off_during_sleep": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "thermal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "camera_min_c",
+        "camera_max_c",
+        "warning_internal_c",
+        "hot_internal_c",
+        "critical_internal_c",
+        "hysteresis_c",
+        "condensation"
+      ],
+      "properties": {
+        "camera_min_c": {
+          "type": "number"
+        },
+        "camera_max_c": {
+          "type": "number"
+        },
+        "warning_internal_c": {
+          "type": "number"
+        },
+        "hot_internal_c": {
+          "type": "number"
+        },
+        "critical_internal_c": {
+          "type": "number"
+        },
+        "hysteresis_c": {
+          "type": "number",
+          "minimum": 0
+        },
+        "condensation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "heater_enabled",
+            "enable_dewpoint_margin_c",
+            "disable_dewpoint_margin_c",
+            "maximum_on_seconds"
+          ],
+          "properties": {
+            "heater_enabled": {
+              "type": "boolean"
+            },
+            "enable_dewpoint_margin_c": {
+              "type": "number"
+            },
+            "disable_dewpoint_margin_c": {
+              "type": "number"
+            },
+            "maximum_on_seconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "report_interval_seconds",
+        "service_watchdog_seconds",
+        "hardware_watchdog_seconds",
+        "diagnostics_retention_days",
+        "persistent_log_max_megabytes"
+      ],
+      "properties": {
+        "report_interval_seconds": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "service_watchdog_seconds": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "hardware_watchdog_seconds": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "diagnostics_retention_days": {
+          "$ref": "#/$defs/positiveInteger"
+        },
+        "persistent_log_max_megabytes": {
+          "$ref": "#/$defs/positiveInteger"
+        }
+      }
+    },
+    "updates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "framework",
+        "channel",
+        "require_external_power_or_soc_percent",
+        "probation_minutes"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "framework": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "channel": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "require_external_power_or_soc_percent": {
+          "$ref": "#/$defs/percent"
+        },
+        "probation_minutes": {
+          "$ref": "#/$defs/positiveInteger"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "absolutePath": {
+      "type": "string",
+      "pattern": "^/"
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "fraction": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "gpio": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 27
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width_px",
+        "height_px"
+      ],
+      "properties": {
+        "width_px": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height_px": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_lux",
+        "exposure_us",
+        "analogue_gain",
+        "colour_gains",
+        "lens_position",
+        "frame_duration_limits_us"
+      ],
+      "properties": {
+        "minimum_lux": {
+          "type": "number",
+          "minimum": 0
+        },
+        "exposure_us": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "analogue_gain": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "colour_gains": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "lens_position": {
+          "type": "number"
+        },
+        "frame_duration_limits_us": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "camera": {
+      "type": "object",
+      "required": [
+        "logical_id",
+        "libcamera_index",
+        "expected_model",
+        "expected_serial",
+        "calibration_file",
+        "profiles"
+      ],
+      "properties": {
+        "logical_id": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "libcamera_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_model": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "expected_serial": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "calibration_file": {
+          "$ref": "#/$defs/absolutePath"
+        },
+        "profiles": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/profile"
+          }
+        }
+      }
+    },
+    "filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "lot",
+        "center_wavelength_nm",
+        "fwhm_nm"
+      ],
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "lot": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "center_wavelength_nm": {
+          "type": "number",
+          "minimum": 700,
+          "maximum": 1100
+        },
+        "fwhm_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "i2cSensor": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "driver",
+        "address",
+        "calibration_file"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "driver": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "address": {
+          "type": "string",
+          "pattern": "^0x[0-9A-Fa-f]{2}$"
+        },
+        "calibration_file": {
+          "$ref": "#/$defs/absolutePath"
+        }
+      }
+    },
+    "networkInterface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "route_metric"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "route_metric": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "profiledNetworkInterface": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "connection_profile",
+        "route_metric",
+        "metered"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "connection_profile": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "route_metric": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "metered": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

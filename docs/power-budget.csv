@@ -1,0 +1,41 @@
+Profile,Load_or_Assumption,Value,Unit,Duty_Cycle,Average_Contribution_W,Engineering_Note
+Continuous,Raspberry Pi 5 plus cooler idle-average,4.5,W,1.0,4.5,Replace with integrated measurement
+Continuous,Cameras averaged over interval,0.5,W,1.0,0.5,Assumes cameras mostly inactive
+Continuous,SSD average,0.6,W,1.0,0.6,Depends on NVMe model and queue activity
+Continuous,Sensors and interface,0.3,W,1.0,0.3,Includes GNSS average if fitted
+Continuous,LTE registered idle plus periodic upload,1.4,W,1.0,1.4,Weak signal may raise this substantially
+Continuous,Fan and heater allowance,0.3,W,1.0,0.3,Site dependent
+Continuous,Conversion and wiring allowance,0.9,W,1.0,0.9,Planning allowance
+Continuous,Total average,8.5,W,1.0,8.5,204Wh per day before field margin
+Continuous,Field margin,20,percent,1.0,1.7,Produces 10.2W design average
+Continuous,Design daily energy,244.8,Wh/day,1.0,10.2,Use 245Wh/day rounded
+Continuous,Solar resource,4,peak-sun-hours/day,NA,NA,Replace with worst-month site value
+Continuous,Solar derating,0.70,fraction,NA,NA,Panel temperature dirt wiring charger and orientation
+Continuous,Calculated minimum panel,87.4,W,NA,NA,245/(4*0.70)
+Continuous,Recommended panel,150,W,NA,NA,Provides practical weather margin
+Continuous,Battery nominal voltage,12.8,V,NA,NA,LiFePO4 baseline
+Continuous,Usable battery fraction,0.80,fraction,NA,NA,Confirm pack/BMS policy
+Continuous,Autonomy target,2,days,NA,NA,Baseline assumption
+Continuous,Calculated battery,47.8,Ah,NA,NA,(245*2)/(12.8*0.80)
+Continuous,Recommended battery,50,Ah,NA,NA,Increase to 100Ah for roughly four days
+Duty_Cycled,Active system,12,W,0.20,2.4,Three active minutes per 15-minute interval
+Duty_Cycled,Sleep/supervisor system,0.15,W,0.80,0.12,Requires switched modem/storage/fan/heaters
+Duty_Cycled,Total average,2.52,W,1.0,2.52,60.48Wh/day before margin
+Duty_Cycled,Field margin,25,percent,1.0,0.63,Accounts for longer registration and retries
+Duty_Cycled,Design daily energy,75.6,Wh/day,1.0,3.15,Use 76Wh/day rounded
+Duty_Cycled,Solar resource,4,peak-sun-hours/day,NA,NA,Replace with worst-month site value
+Duty_Cycled,Solar derating,0.70,fraction,NA,NA,Same planning derating
+Duty_Cycled,Calculated minimum panel,27,W,NA,NA,76/(4*0.70)
+Duty_Cycled,Recommended panel,100,W,NA,NA,Provides weather and backlog margin
+Duty_Cycled,Battery nominal voltage,12.8,V,NA,NA,LiFePO4 baseline
+Duty_Cycled,Usable battery fraction,0.80,fraction,NA,NA,Confirm pack/BMS policy
+Duty_Cycled,Autonomy target,4,days,NA,NA,Reference robust duty-cycle package
+Duty_Cycled,Calculated battery,29.7,Ah,NA,NA,(76*4)/(12.8*0.80)
+Duty_Cycled,Recommended battery,40,Ah,NA,NA,Validate against site and cold behavior
+Peak,Pi plus cameras,15,W,NA,NA,NA,Design transient assumption
+Peak,SSD,5,W,NA,NA,NA,Model dependent
+Peak,LTE modem,10,W,NA,NA,NA,Carrier and signal dependent
+Peak,Heater/fan,4,W,NA,NA,NA,Optional
+Peak,Sensors/interface,1,W,NA,NA,NA,Conservative
+Peak,5V distribution continuous target,40,W,NA,NA,NA,8A minimum class
+Peak,Preferred converter class,50-60,W,NA,NA,NA,Provides practical margin and derating

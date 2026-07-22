@@ -1,0 +1,53 @@
+Item_ID,Subsystem,Manufacturer,Model_or_Specification,Qty,Purpose,Preferred_Supplier_Type,Planning_Cost_USD_Each,Approved_Alternative,Procurement_Note
+BOM-001,Compute,Raspberry Pi,Raspberry Pi 5 4GB,1,Main compute and I/O,Raspberry Pi Approved Reseller,110,Raspberry Pi 5 8GB,"Confirm current price and availability; 4GB is baseline"
+BOM-002,Thermal,Raspberry Pi,Active Cooler for Raspberry Pi 5,1,CPU cooling,Raspberry Pi Approved Reseller,7,Validated retained Pi 5 cooler,Required for sealed enclosure tests
+BOM-003,Time,Raspberry Pi,RTC Battery for Raspberry Pi 5,1,RTC holdover and scheduled wake,Raspberry Pi Approved Reseller,7,Qualified rechargeable RTC battery assembly,Use correct connector and chemistry
+BOM-004,Camera,Raspberry Pi,Camera Module 3 standard,1,RGB image acquisition,Raspberry Pi Approved Reseller,30,Industrial RGB camera if sync/rating fails,Factory IR-cut path
+BOM-005,Camera,Raspberry Pi,Camera Module 3 NoIR standard,1,NIR image acquisition,Raspberry Pi Approved Reseller,30,Triggerable monochrome NIR camera,Requires external NIR filter
+BOM-006,Camera,Raspberry Pi,Pi 5 camera cable 22-pin to 15-pin selected length,3,Two installed and one spare,Raspberry Pi Approved Reseller,8,Reputable Pi 5-compatible cable,Verify length after mechanical layout
+BOM-007,Optics,MidOpt or equivalent,BN850-class 850nm band-pass filter OD3 preferred,1,NIR spectral isolation,Authorized optical distributor,150,715nm long-pass filter for qualitative prototype,Verify passband curve clear aperture and angle shift
+BOM-008,Optics,Edmund or equivalent,AR-coated visible optical window,1,RGB protective window,Authorized optical distributor,40,Uncoated optical glass validated in assembly,Do not use uncharacterized enclosure lid
+BOM-009,Optics,Edmund or equivalent,NIR-transmitting optical window at 850nm,1,NIR protective window,Authorized optical distributor,40,Fused silica or qualified optical glass,Verify assembled transmission
+BOM-010,Optics,Custom,Blackened dual-camera optical baffle and filter holder,1,Suppress reflections and edge light,Qualified machine shop,75,Heat-resistant printed EVT part,Must retain filter without stress
+BOM-011,Mechanical,Custom,Rigid dual-camera common-datum bracket,1,Maintain pair alignment,Qualified machine shop,100,Dimensionally stable printed EVT part,Provide serial/revision and adjustment locks
+BOM-012,Storage,Raspberry Pi,512GB SSD Kit or qualified 3D TLC SSD,1,OS and offline data queue,Raspberry Pi Approved Reseller,80,Industrial-temperature 512GB NVMe,Run thermal and endurance qualification
+BOM-013,Storage,Industrial or high-endurance,32-64GB high-endurance microSD,2,Recovery and controlled spare,Authorized distributor,15,Qualified SLC-mode industrial microSD,Do not use as primary data queue
+BOM-014,Sensor,Sensirion,SHT45 carrier or protected probe,1,Ambient temperature and humidity,Authorized distributor,25,Industrial Modbus temperature/RH probe,Mount in external radiation shield
+BOM-015,Sensor,Bosch Sensortec,BMP390 carrier,1,Barometric pressure,Authorized distributor,18,Integrated Modbus weather probe,Place near pressure vent away from heat
+BOM-016,Sensor,Vishay,VEML7700 carrier,1,Ambient illuminance,Authorized distributor,12,Calibrated irradiance sensor,Requires diffuser and assembled calibration
+BOM-017,Power telemetry,Texas Instruments,INA228 carrier,1,Input voltage current and power monitoring,Authorized distributor,25,INA238 class monitor if range is sufficient,Use Kelvin sense
+BOM-018,Power telemetry,Vishay or equivalent,10mOhm 4-terminal shunt 3W minimum,1,System current measurement,Authorized distributor,12,Value selected to fit final current range,Verify shunt voltage and power limits
+BOM-019,GNSS,u-blox,MAX-M10S carrier,1,Location and disciplined time,Authorized module vendor,45,Modem-integrated GNSS,Optional for surveyed fixed sites
+BOM-020,GNSS,Taoglas or equivalent,Active multi-constellation GNSS antenna,1,GNSS sky-view antenna,Authorized distributor,35,Qualified passive antenna with correct design,Match receiver bias and connector
+BOM-021,Cellular,Quectel,EG25-G regional LTE Cat 4 module on supported carrier,1,Primary cellular WAN,Authorized carrier vendor,150,Region-specific Quectel or Telit LTE module,Carrier bands and certifications are procurement gate
+BOM-022,Cellular,Taoglas or equivalent,Wideband LTE main antenna,1,LTE main path,Authorized distributor,35,Carrier-vendor approved antenna,Match frequency bands and connector
+BOM-023,Cellular,Taoglas or equivalent,Wideband LTE diversity antenna,1,LTE diversity path,Authorized distributor,35,Carrier-vendor approved antenna,Maintain installed separation
+BOM-024,Cellular,Industrial/reputable,Externally powered USB 3 hub or modem carrier,1,Independent modem power and USB data,Authorized distributor,50,Direct M.2/USB carrier with load control,Must recover from branch power cycle
+BOM-025,Power,Mean Well,DDR-60G-5 class 9-36V to 5V 10A DC/DC,1,Primary 5.1V conversion,Authorized distributor,65,Qualified 50-60W industrial buck converter,Verify input range derating ripple and startup
+BOM-026,Power,Custom,Input protection and load-switch PCB revision A,1,Fusing reverse protection sensing and branch control,Qualified PCB assembler,90,Commercial industrial power distribution assembly,Requires schematic review and test
+BOM-027,Protection,Littelfuse or equivalent,Source and branch fuse set,1 lot,Wire and branch fault protection,Authorized distributor,25,DC breakers where appropriate,Select interrupt rating from source fault current
+BOM-028,Protection,Littelfuse or equivalent,Input TVS and ESD protection set,1 lot,Transient protection,Authorized distributor,20,Protection selected after surge review,Standoff and clamp must match bus/converter
+BOM-029,Enclosure,Fibox or equivalent,UV-stable opaque polycarbonate IP66 class approx 300x250x150mm,1,Outdoor electronics enclosure,Industrial enclosure distributor,150,Hammond or Polycase equivalent,Final modified assembly requires ingress test
+BOM-030,Enclosure,Enclosure vendor,Metal internal mounting plate,1,Mount and spread heat,Industrial enclosure distributor,40,Custom aluminum plate,Match enclosure accessory
+BOM-031,Enclosure,Gore or equivalent,Hydrophobic pressure equalization vent,1,Reduce pressure and condensation stress,Authorized distributor,25,Qualified IP-rated enclosure vent,Match airflow wall thickness and ingress target
+BOM-032,Enclosure,Hummel or equivalent,IP68 cable gland assortment,1 lot,Sealed cable entry,Industrial distributor,60,Qualified circular IP connector set,Match actual cable diameters
+BOM-033,Enclosure,Enclosure vendor,Rated blanking plugs,1 lot,Seal unused entries,Industrial distributor,15,Qualified gland plugs,Same thread and ingress class
+BOM-034,Sensor mechanics,MetSpec or equivalent,Multi-plate naturally aspirated radiation shield,1,Protect ambient temperature/RH sensor,Weather-instrument supplier,65,Custom validated shield,Keep away from enclosure heat
+BOM-035,Mechanical,Custom,Pole/wall/tripod enclosure bracket,1,Field mounting,Qualified fabricator,125,Commercial enclosure pole-mount kit,Site wind-load review required
+BOM-036,Mechanical,Custom,White solar/rain shield with air gap,1,Reduce solar load and direct rain,Qualified fabricator,75,Commercial enclosure sun shield,Do not block antennas or vent
+BOM-037,Wiring,Molex or equivalent,Locking internal connector and terminal assortment,1 lot,Serviceable harnessing,Authorized distributor,60,Industrial pluggable terminal system,No loose Dupont jumpers
+BOM-038,Wiring,Alpha Wire or equivalent,UV and temperature-rated cable assortment,1 lot,Power sensor and external wiring,Authorized distributor,60,Regionally approved equivalent,Size for voltage drop and fault current
+BOM-039,Wiring,Brady or equivalent,Heat-shrink wire and device labels,1 lot,Traceability,Industrial distributor,25,Durable printed labels,Label both harness ends
+BOM-040,Calibration,Calibrite or equivalent,Visible geometric calibration target,1,RGB geometric calibration,Imaging supplier,75,Custom NIR-visible target,Verify NIR contrast
+BOM-041,Calibration,Labsphere or equivalent,Known-reflectance gray/white target set,1,Radiometric reference,Optical calibration supplier,250,Characterized field reflectance panel,Protect from weather and contamination
+BOM-042,Service,Custom,Desiccant holder humidity card and replacement desiccant,1 set,Moisture commissioning indicator,Industrial distributor,20,Regenerable desiccant system,Not sole condensation control
+BOM-043,Service,Custom,Optical cleaning kit,1,Window/filter maintenance,Optical supplier,25,Approved equivalent,Document compatible fluid and wipes
+BOM-044,Security,Infineon or equivalent,TPM 2.0 module compatible with platform,1,Hardware-backed identity,Authorized distributor,35,Secure element,Optional but recommended for production
+BOM-045,Supervisor,Analog Devices or equivalent,External low-power watchdog/power supervisor assembly,1,Recover from Pi power-state failure,Authorized module vendor,45,Custom supervisor MCU,Recommended for remote solar deployment
+BOM-046,Optional sensor,Texas Instruments,ADS1115 protected carrier,1,Optional wind-vane analog input,Authorized distributor,18,Industrial 4-20mA or Modbus input,Only for short protected analog path
+BOM-047,Optional weather,Industrial weather vendor,RS-485 Modbus rain/wind instrument,1,Optional remote weather sensing,Authorized weather supplier,250,Protected pulse sensors,Preferred for long outdoor cable
+BOM-048,Solar,Qualified solar vendor,100W panel duty-cycle or 150W continuous,1,Energy harvesting,Solar distributor,150,Site-sized panel,Use worst-month solar calculation
+BOM-049,Solar,Victron or equivalent,LiFePO4-compatible MPPT controller with telemetry,1,Battery charging,Solar distributor,150,Qualified industrial MPPT,Verify cold panel Voc and battery profile
+BOM-050,Solar,Qualified battery vendor,12.8V 40-50Ah LiFePO4 with BMS,1,Two-day class energy storage,Solar/battery distributor,300,Larger capacity after site study,Require low-temperature charge protection where needed
+BOM-051,Solar,Qualified DC vendor,PV and battery DC disconnect/fuse set,1,Safe isolation and branch protection,Solar distributor,80,DC-rated breakers,Install battery fuse near positive terminal
+BOM-052,Solar,Custom,Wind-rated panel mounting hardware,1,Secure solar panel,Qualified fabricator,125,Commercial pole mount,Site-specific structural review
