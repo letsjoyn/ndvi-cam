@@ -30,6 +30,13 @@ class Settings:
     s3_endpoint_url: str = ""
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
+    webcam_enabled: bool = True
+    webcam_index: int = 0
+    webcam_name: str = "USB RGB camera"
+    webcam_width: int = 1280
+    webcam_height: int = 720
+    webcam_fps: int = 30
+    webcam_zoom: float = 1.0
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -49,9 +56,15 @@ class Settings:
             s3_endpoint_url=os.getenv("S3_ENDPOINT_URL", ""),
             s3_access_key_id=os.getenv("S3_ACCESS_KEY_ID", ""),
             s3_secret_access_key=os.getenv("S3_SECRET_ACCESS_KEY", ""),
+            webcam_enabled=_env_bool("WEBCAM_ENABLED", True),
+            webcam_index=int(os.getenv("WEBCAM_INDEX", "0")),
+            webcam_name=os.getenv("WEBCAM_NAME", "USB RGB camera"),
+            webcam_width=int(os.getenv("WEBCAM_WIDTH", "1280")),
+            webcam_height=int(os.getenv("WEBCAM_HEIGHT", "720")),
+            webcam_fps=int(os.getenv("WEBCAM_FPS", "30")),
+            webcam_zoom=float(os.getenv("WEBCAM_ZOOM", "1.0")),
         )
 
     @property
     def media_dir(self) -> Path:
         return self.data_dir / "media"
-

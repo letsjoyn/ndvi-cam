@@ -1,0 +1,2 @@
+# Picamera2, NumPy, and OpenCV should come from Raspberry Pi OS packages.
+httpx>=0.27,<1

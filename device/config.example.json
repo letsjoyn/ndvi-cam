@@ -1,0 +1,21 @@
+{
+  "device_id": "field-node-01",
+  "api_base_url": "http://127.0.0.1:8000",
+  "device_key": "",
+  "queue_path": "../data/device-queue",
+  "registration_file": "calibration.example.json",
+  "simulate": true,
+  "rgb_camera_index": 0,
+  "nir_camera_index": 1,
+  "poll_seconds": 2,
+  "profile_refresh_seconds": 60,
+  "heartbeat_seconds": 60,
+  "retry_base_seconds": 5,
+  "retry_max_seconds": 300,
+  "capture_retry_count": 1,
+  "capture_on_start": false,
+  "align_to_interval": true,
+  "simulated_illuminance_lux": 7500,
+  "verify_tls": true,
+  "firmware_version": "0.2.0"
+}

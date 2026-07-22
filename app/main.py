@@ -23,22 +23,39 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from .config import Settings
 from .database import Database
 from .image_processing import (
+    ImageMetrics,
     ImageValidationError,
+    analyze_image,
     compute_ndvi,
     make_thumbnail,
     sha256_bytes,
     validate_pair,
 )
-from .models import Capture, Device, utcnow
-from .schemas import CaptureProfileUpdate, HeartbeatIn
+from .models import (
+    Capture,
+    Device,
+    DeviceCommand,
+    DevicePreview,
+    WebcamSnapshot,
+    utcnow,
+)
+from .schemas import (
+    CaptureProfileUpdate,
+    DeviceCommandComplete,
+    DeviceCommandCreate,
+    DevicePreviewStart,
+    HeartbeatIn,
+    WebcamConfigUpdate,
+)
 from .seed import seed_demo_data
 from .storage import Storage, build_storage
+from .webcam import WebcamError, WebcamManager
 
 
 def parse_datetime(value: str | None) -> datetime:
@@ -138,11 +155,179 @@ def serialize_capture(capture: Capture, include_metadata: bool = False) -> dict[
     return payload
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def serialize_command(command: DeviceCommand) -> dict[str, Any]:
+    return {
+        "id": command.id,
+        "device_id": command.device_id,
+        "type": command.command_type,
+        "status": command.status,
+        "payload": json_load(command.payload_json, {}),
+        "result": json_load(command.result_json, {}),
+        "created_at": command.created_at.isoformat() + "Z",
+        "claimed_at": command.claimed_at.isoformat() + "Z"
+        if command.claimed_at
+        else None,
+        "completed_at": command.completed_at.isoformat() + "Z"
+        if command.completed_at
+        else None,
+    }
+
+
+def serialize_webcam_snapshot(snapshot: WebcamSnapshot) -> dict[str, Any]:
+    return {
+        "id": snapshot.id,
+        "captured_at": snapshot.captured_at.isoformat() + "Z",
+        "date_key": snapshot.date_key,
+        "camera_name": snapshot.camera_name,
+        "resolution": {
+            "width": snapshot.width,
+            "height": snapshot.height,
+        },
+        "fps": round(snapshot.fps, 2),
+        "zoom": round(snapshot.zoom, 2),
+        "quality": {
+            "blur_score": round(snapshot.blur_score, 2),
+            "mean": round(snapshot.mean_normalized, 4),
+            "dark_fraction": round(snapshot.dark_fraction, 5),
+            "saturated_fraction": round(snapshot.saturated_fraction, 5),
+        },
+        "assets": {
+            "rgb": media_url(snapshot.image_key),
+            "thumb": media_url(snapshot.thumb_key),
+        },
+    }
+
+
+def webcam_quality_failures(metrics: ImageMetrics) -> list[str]:
+    failures: list[str] = []
+    if metrics.blur_score < 80.0:
+        failures.append(
+            f"Image is too blurry (sharpness {metrics.blur_score:.1f}; minimum 80.0)"
+        )
+    if metrics.mean_normalized < 0.06:
+        failures.append("Image is too dark")
+    if metrics.mean_normalized > 0.94:
+        failures.append("Image is overexposed")
+    if metrics.dark_fraction > 0.45:
+        failures.append("Dark-pixel fraction is too high")
+    if metrics.saturated_fraction > 0.20:
+        failures.append("Saturated-pixel fraction is too high")
+    return failures
+
+
+def serialize_device_preview(
+    preview: DevicePreview | None,
+    device: Device,
+) -> dict[str, Any]:
+    now = utcnow()
+    if preview is None:
+        return {
+            "device_id": device.id,
+            "device_name": device.name,
+            "site_name": device.site_name,
+            "active": False,
+            "state": "stopped",
+            "session_id": None,
+            "requested_until": None,
+            "interval_seconds": 2.0,
+            "preview_width": 960,
+            "sequence": 0,
+            "latest_at": None,
+            "resolution": None,
+            "sync_delta_ms": None,
+            "quality": None,
+            "assets": {"rgb": None, "nir": None},
+        }
+
+    active = preview.requested_until > now
+    has_current_frame = (
+        preview.latest_session_id == preview.session_id
+        and preview.latest_at is not None
+        and preview.rgb_key is not None
+        and preview.nir_key is not None
+    )
+    freshness_limit = max(15.0, preview.interval_seconds * 6.0)
+    fresh = bool(
+        active
+        and has_current_frame
+        and preview.latest_at
+        and (now - preview.latest_at).total_seconds() <= freshness_limit
+    )
+    state = "streaming" if fresh else "waiting" if active else "stopped"
+    return {
+        "device_id": device.id,
+        "device_name": device.name,
+        "site_name": device.site_name,
+        "active": active,
+        "state": state,
+        "session_id": preview.session_id,
+        "requested_until": preview.requested_until.isoformat() + "Z",
+        "interval_seconds": round(preview.interval_seconds, 2),
+        "preview_width": preview.preview_width,
+        "sequence": preview.sequence if has_current_frame else 0,
+        "latest_at": preview.latest_at.isoformat() + "Z"
+        if has_current_frame and preview.latest_at
+        else None,
+        "resolution": {
+            "width": preview.width,
+            "height": preview.height,
+        }
+        if has_current_frame
+        else None,
+        "sync_delta_ms": round(preview.sync_delta_ms, 2)
+        if has_current_frame and preview.sync_delta_ms is not None
+        else None,
+        "quality": {
+            "rgb_blur_score": round(preview.rgb_blur_score, 2),
+            "nir_blur_score": round(preview.nir_blur_score, 2),
+            "rgb_mean": round(preview.rgb_mean, 4),
+            "nir_mean": round(preview.nir_mean, 4),
+            "rgb_saturated_fraction": round(
+                preview.rgb_saturated_fraction,
+                5,
+            ),
+            "nir_saturated_fraction": round(
+                preview.nir_saturated_fraction,
+                5,
+            ),
+        }
+        if has_current_frame
+        and all(
+            value is not None
+            for value in (
+                preview.rgb_blur_score,
+                preview.nir_blur_score,
+                preview.rgb_mean,
+                preview.nir_mean,
+                preview.rgb_saturated_fraction,
+                preview.nir_saturated_fraction,
+            )
+        )
+        else None,
+        "assets": {
+            "rgb": media_url(preview.rgb_key) if has_current_frame else None,
+            "nir": media_url(preview.nir_key) if has_current_frame else None,
+        },
+    }
+
+
+def create_app(
+    settings: Settings | None = None,
+    webcam_manager: WebcamManager | Any | None = None,
+) -> FastAPI:
     app_settings = settings or Settings.from_env()
     app_settings.data_dir.mkdir(parents=True, exist_ok=True)
     database = Database(app_settings.database_url)
     storage = build_storage(app_settings)
+    webcam = webcam_manager or WebcamManager(
+        enabled=app_settings.webcam_enabled,
+        camera_index=app_settings.webcam_index,
+        camera_name=app_settings.webcam_name,
+        width=app_settings.webcam_width,
+        height=app_settings.webcam_height,
+        fps=app_settings.webcam_fps,
+        zoom=app_settings.webcam_zoom,
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -150,7 +335,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if app_settings.seed_demo:
             with database.session_factory() as db:
                 seed_demo_data(db, storage)
-        yield
+        try:
+            yield
+        finally:
+            webcam.stop()
 
     app = FastAPI(
         title=f"{app_settings.app_name} API",
@@ -160,6 +348,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = app_settings
     app.state.database = database
     app.state.storage = storage
+    app.state.webcam = webcam
 
     def get_db() -> Session:
         with database.session_factory() as db:
@@ -185,6 +374,137 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "storage_backend": app_settings.storage_backend,
             "time": datetime.now(timezone.utc).isoformat(),
         }
+
+    @app.get("/api/webcam/status")
+    def webcam_status() -> dict[str, Any]:
+        return webcam.status()
+
+    @app.post("/api/webcam/start")
+    def start_webcam() -> dict[str, Any]:
+        try:
+            return webcam.start()
+        except WebcamError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.post("/api/webcam/stop")
+    def stop_webcam() -> dict[str, Any]:
+        webcam.stop()
+        return webcam.status()
+
+    @app.put("/api/webcam/config")
+    def configure_webcam(payload: WebcamConfigUpdate) -> dict[str, Any]:
+        try:
+            return webcam.configure(**payload.model_dump())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except WebcamError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.get("/api/webcam/stream.mjpg")
+    def stream_webcam() -> StreamingResponse:
+        try:
+            webcam.start()
+        except WebcamError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return StreamingResponse(
+            webcam.mjpeg_stream(maximum_fps=10),
+            media_type="multipart/x-mixed-replace; boundary=frame",
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+                "Pragma": "no-cache",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    @app.post("/api/webcam/capture", status_code=201)
+    def capture_webcam_snapshot(
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any]:
+        try:
+            image_data = webcam.capture_jpeg()
+        except WebcamError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        try:
+            metrics = analyze_image(image_data)
+        except ImageValidationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        failures = webcam_quality_failures(metrics)
+        if failures:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "WEBCAM_QUALITY_REJECTED",
+                    "message": "; ".join(failures),
+                },
+            )
+
+        status = webcam.status()
+        configured = status["configured"]
+        active = status["active"]
+        captured_at = utcnow()
+        snapshot_id = str(uuid.uuid4())
+        date_key = captured_at.date().isoformat()
+        prefix = f"webcam/{date_key}/{snapshot_id}"
+        image_key = f"{prefix}/rgb.jpg"
+        thumb_key = f"{prefix}/thumb.jpg"
+        written: list[str] = []
+
+        try:
+            storage.put_bytes(image_key, image_data, "image/jpeg")
+            written.append(image_key)
+            storage.put_bytes(
+                thumb_key,
+                make_thumbnail(image_data, width=520),
+                "image/jpeg",
+            )
+            written.append(thumb_key)
+            snapshot = WebcamSnapshot(
+                id=snapshot_id,
+                captured_at=captured_at,
+                date_key=date_key,
+                image_key=image_key,
+                thumb_key=thumb_key,
+                width=metrics.width,
+                height=metrics.height,
+                fps=float(active["fps"]),
+                zoom=float(configured["zoom"]),
+                blur_score=metrics.blur_score,
+                mean_normalized=metrics.mean_normalized,
+                dark_fraction=metrics.dark_fraction,
+                saturated_fraction=metrics.saturated_fraction,
+                camera_name=str(status["camera_name"]),
+            )
+            db.add(snapshot)
+            db.commit()
+            db.refresh(snapshot)
+        except Exception:
+            db.rollback()
+            for key in written:
+                storage.delete(key)
+            raise
+        return serialize_webcam_snapshot(snapshot)
+
+    @app.get("/api/webcam/snapshots")
+    def list_webcam_snapshots(
+        date_from: date | None = None,
+        date_to: date | None = None,
+        limit: int = 50,
+        db: Session = Depends(get_db),
+    ) -> list[dict[str, Any]]:
+        query = select(WebcamSnapshot)
+        if date_from:
+            query = query.where(WebcamSnapshot.date_key >= date_from.isoformat())
+        if date_to:
+            query = query.where(WebcamSnapshot.date_key <= date_to.isoformat())
+        query = query.order_by(WebcamSnapshot.captured_at.desc()).limit(
+            min(max(limit, 1), 250)
+        )
+        return [
+            serialize_webcam_snapshot(snapshot)
+            for snapshot in db.scalars(query)
+        ]
 
     @app.get("/api/dashboard")
     def dashboard_data(days: int = 14, db: Session = Depends(get_db)) -> dict[str, Any]:
@@ -261,6 +581,161 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             for device in db.scalars(select(Device).order_by(Device.name))
         ]
 
+    @app.post("/api/devices/{device_id}/preview/start")
+    def start_device_preview(
+        device_id: str,
+        payload: DevicePreviewStart,
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any]:
+        device = db.get(Device, device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+
+        now = utcnow()
+        preview = db.get(DevicePreview, device_id)
+        can_extend = bool(
+            preview
+            and preview.requested_until > now
+            and preview.preview_width == payload.preview_width
+        )
+        if preview is None:
+            preview = DevicePreview(
+                device_id=device_id,
+                session_id=str(uuid.uuid4()),
+                requested_until=now,
+            )
+            db.add(preview)
+        elif not can_extend:
+            preview.session_id = str(uuid.uuid4())
+            preview.sequence = 0
+            preview.latest_session_id = None
+            preview.latest_at = None
+
+        preview.requested_until = now + timedelta(seconds=payload.session_seconds)
+        preview.interval_seconds = payload.interval_seconds
+        preview.preview_width = payload.preview_width
+        preview.updated_at = now
+        db.commit()
+        db.refresh(preview)
+        return serialize_device_preview(preview, device)
+
+    @app.post("/api/devices/{device_id}/preview/stop")
+    def stop_device_preview(
+        device_id: str,
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any]:
+        device = db.get(Device, device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+        preview = db.get(DevicePreview, device_id)
+        if preview:
+            preview.requested_until = utcnow()
+            preview.updated_at = utcnow()
+            db.commit()
+            db.refresh(preview)
+        return serialize_device_preview(preview, device)
+
+    @app.get("/api/devices/{device_id}/preview")
+    def get_device_preview(
+        device_id: str,
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any]:
+        device = db.get(Device, device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+        return serialize_device_preview(db.get(DevicePreview, device_id), device)
+
+    @app.get("/api/devices/{device_id}/preview/request")
+    def get_device_preview_request(
+        device_id: str,
+        x_device_key: str | None = Header(default=None),
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any]:
+        verify_device_key(app_settings, x_device_key)
+        if not db.get(Device, device_id):
+            raise HTTPException(status_code=404, detail="Device not found")
+        preview = db.get(DevicePreview, device_id)
+        if preview is None or preview.requested_until <= utcnow():
+            return {"active": False}
+        return {
+            "active": True,
+            "session_id": preview.session_id,
+            "interval_seconds": preview.interval_seconds,
+            "preview_width": preview.preview_width,
+            "requested_until": preview.requested_until.isoformat() + "Z",
+        }
+
+    @app.post("/api/devices/{device_id}/preview/frame")
+    async def upload_device_preview_frame(
+        device_id: str,
+        session_id: str = Form(...),
+        captured_at: str | None = Form(default=None),
+        sync_delta_ms: float | None = Form(default=None),
+        rgb: UploadFile = File(...),
+        nir: UploadFile = File(...),
+        x_device_key: str | None = Header(default=None),
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any]:
+        verify_device_key(app_settings, x_device_key)
+        device = db.get(Device, device_id)
+        if not device:
+            raise HTTPException(status_code=404, detail="Device not found")
+        preview = db.get(DevicePreview, device_id)
+        if (
+            preview is None
+            or preview.requested_until <= utcnow()
+            or preview.session_id != session_id
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Preview session is no longer active",
+            )
+
+        rgb_data = await read_upload(rgb, min(app_settings.max_upload_mb, 12))
+        nir_data = await read_upload(nir, min(app_settings.max_upload_mb, 12))
+        try:
+            rgb_metrics = analyze_image(rgb_data)
+            nir_metrics = analyze_image(nir_data)
+        except ImageValidationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if (rgb_metrics.width, rgb_metrics.height) != (
+            nir_metrics.width,
+            nir_metrics.height,
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="RGB and NIR preview frames must have identical dimensions",
+            )
+
+        keys = {
+            "rgb": f"previews/{device_id}/rgb.jpg",
+            "nir": f"previews/{device_id}/nir.jpg",
+        }
+        storage.put_bytes(keys["rgb"], rgb_data, rgb.content_type or "image/jpeg")
+        storage.put_bytes(keys["nir"], nir_data, nir.content_type or "image/jpeg")
+
+        preview.sequence += 1
+        preview.latest_session_id = session_id
+        preview.latest_at = parse_datetime(captured_at)
+        preview.rgb_key = keys["rgb"]
+        preview.nir_key = keys["nir"]
+        preview.width = rgb_metrics.width
+        preview.height = rgb_metrics.height
+        preview.sync_delta_ms = sync_delta_ms
+        preview.rgb_blur_score = rgb_metrics.blur_score
+        preview.nir_blur_score = nir_metrics.blur_score
+        preview.rgb_mean = rgb_metrics.mean_normalized
+        preview.nir_mean = nir_metrics.mean_normalized
+        preview.rgb_saturated_fraction = rgb_metrics.saturated_fraction
+        preview.nir_saturated_fraction = nir_metrics.saturated_fraction
+        preview.updated_at = utcnow()
+        device.last_seen_at = utcnow()
+        device.status = "online"
+        device.updated_at = utcnow()
+        db.commit()
+        db.refresh(preview)
+        return serialize_device_preview(preview, device)
+
     @app.get("/api/devices/{device_id}/capture-profile")
     def get_capture_profile(
         device_id: str,
@@ -317,6 +792,113 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         db.commit()
         return serialize_device(device)
 
+    @app.post("/api/devices/{device_id}/commands", status_code=201)
+    def create_device_command(
+        device_id: str,
+        payload: DeviceCommandCreate,
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any]:
+        if not db.get(Device, device_id):
+            raise HTTPException(status_code=404, detail="Device not found")
+        command = DeviceCommand(
+            id=str(uuid.uuid4()),
+            device_id=device_id,
+            command_type=payload.type,
+            status="pending",
+            payload_json=json.dumps(payload.payload, separators=(",", ":")),
+        )
+        db.add(command)
+        db.commit()
+        db.refresh(command)
+        return serialize_command(command)
+
+    @app.get("/api/devices/{device_id}/commands")
+    def list_device_commands(
+        device_id: str,
+        limit: int = 20,
+        db: Session = Depends(get_db),
+    ) -> list[dict[str, Any]]:
+        if not db.get(Device, device_id):
+            raise HTTPException(status_code=404, detail="Device not found")
+        commands = db.scalars(
+            select(DeviceCommand)
+            .where(DeviceCommand.device_id == device_id)
+            .order_by(DeviceCommand.created_at.desc())
+            .limit(min(max(limit, 1), 100))
+        )
+        return [serialize_command(command) for command in commands]
+
+    @app.get("/api/devices/{device_id}/commands/{command_id}")
+    def get_device_command(
+        device_id: str,
+        command_id: str,
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any]:
+        command = db.get(DeviceCommand, command_id)
+        if command is None or command.device_id != device_id:
+            raise HTTPException(status_code=404, detail="Command not found")
+        return serialize_command(command)
+
+    @app.post("/api/devices/{device_id}/commands/claim")
+    def claim_device_command(
+        device_id: str,
+        x_device_key: str | None = Header(default=None),
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any] | None:
+        verify_device_key(app_settings, x_device_key)
+        if not db.get(Device, device_id):
+            raise HTTPException(status_code=404, detail="Device not found")
+        stale_before = utcnow() - timedelta(minutes=5)
+        command = db.scalar(
+            select(DeviceCommand)
+            .where(
+                DeviceCommand.device_id == device_id,
+                or_(
+                    DeviceCommand.status == "pending",
+                    and_(
+                        DeviceCommand.status == "running",
+                        DeviceCommand.claimed_at < stale_before,
+                    ),
+                ),
+            )
+            .order_by(DeviceCommand.created_at)
+            .limit(1)
+        )
+        if command is None:
+            return None
+        command.status = "running"
+        command.claimed_at = utcnow()
+        db.commit()
+        db.refresh(command)
+        return serialize_command(command)
+
+    @app.post("/api/devices/{device_id}/commands/{command_id}/complete")
+    def complete_device_command(
+        device_id: str,
+        command_id: str,
+        payload: DeviceCommandComplete,
+        x_device_key: str | None = Header(default=None),
+        db: Session = Depends(get_db),
+    ) -> dict[str, Any]:
+        verify_device_key(app_settings, x_device_key)
+        command = db.get(DeviceCommand, command_id)
+        if command is None or command.device_id != device_id:
+            raise HTTPException(status_code=404, detail="Command not found")
+        if command.status not in {"pending", "running"}:
+            return serialize_command(command)
+        command.status = payload.status
+        command.completed_at = utcnow()
+        command.result_json = json.dumps(
+            {
+                "capture_id": payload.capture_id,
+                "message": payload.message,
+            },
+            separators=(",", ":"),
+        )
+        db.commit()
+        db.refresh(command)
+        return serialize_command(command)
+
     @app.get("/api/captures")
     def list_captures(
         date_from: date | None = None,
@@ -354,6 +936,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/captures")
     async def create_capture(
+        capture_id: str | None = Form(default=None),
         device_id: str = Form(...),
         captured_at: str | None = Form(default=None),
         source: str = Form(default="device"),
@@ -372,6 +955,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         device = db.get(Device, device_id)
         if not device:
             raise HTTPException(status_code=404, detail="Device not found")
+        if capture_id and len(capture_id) > 80:
+            raise HTTPException(status_code=422, detail="capture_id is too long")
+        if capture_id:
+            existing = db.scalar(
+                select(Capture)
+                .options(selectinload(Capture.device))
+                .where(Capture.id == capture_id)
+            )
+            if existing:
+                if existing.device_id != device_id:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="capture_id belongs to another device",
+                    )
+                return JSONResponse(
+                    status_code=200,
+                    content=serialize_capture(existing, include_metadata=True),
+                )
 
         rgb_data = await read_upload(rgb, app_settings.max_upload_mb)
         nir_data = await read_upload(nir, app_settings.max_upload_mb)
@@ -407,7 +1008,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ) from exc
 
         capture_time = parse_datetime(captured_at)
-        capture_id = str(uuid.uuid4())
+        capture_id = capture_id or str(uuid.uuid4())
         date_key = capture_time.date().isoformat()
         prefix = f"captures/{date_key}/{capture_id}"
         keys = {
@@ -567,4 +1168,3 @@ async def read_upload(upload: UploadFile, maximum_mb: int) -> bytes:
 
 
 app = create_app()
-

@@ -1,0 +1,9 @@
+{
+  "calibration_id": "PAIR-IDENTITY-DEVELOPMENT",
+  "description": "Development-only identity transform. Replace after stereo calibration.",
+  "nir_to_rgb_homography": [
+    [1.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0],
+    [0.0, 0.0, 1.0]
+  ]
+}

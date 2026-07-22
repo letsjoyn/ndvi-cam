@@ -6,6 +6,19 @@ const state = {
   calibration: null,
   selectedCapture: null,
   selectedAsset: "ndvi",
+  currentView: "dashboard",
+  liveSource: "device",
+  liveDeviceId: null,
+  devicePreview: null,
+  devicePreviewSequence: null,
+  devicePreviewPoll: null,
+  devicePreviewKeepalive: null,
+  fieldCaptureCommand: null,
+  fieldCaptureResult: null,
+  fieldCapturePoll: null,
+  webcamStatus: null,
+  webcamSnapshots: [],
+  webcamPoll: null,
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -447,10 +460,16 @@ function renderDeviceTable() {
           <td>${device.battery_percent === null ? "-" : `${Math.round(device.battery_percent)}%`}</td>
           <td>${escapeHtml(relativeTime(device.last_seen_at))}</td>
           <td>
-            <button class="icon-button table-calibration" type="button"
-              data-device-id="${escapeHtml(device.id)}" title="Open calibration">
-              <i data-lucide="settings-2"></i>
-            </button>
+            <div class="table-actions">
+              <button class="icon-button table-capture-now" type="button"
+                data-device-id="${escapeHtml(device.id)}" title="Capture now">
+                <i data-lucide="camera"></i>
+              </button>
+              <button class="icon-button table-calibration" type="button"
+                data-device-id="${escapeHtml(device.id)}" title="Open calibration">
+                <i data-lucide="settings-2"></i>
+              </button>
+            </div>
           </td>
         </tr>
       `,
@@ -465,6 +484,11 @@ function renderDeviceTable() {
       switchView("calibration");
     });
   });
+  $$(".table-capture-now").forEach((button) => {
+    button.addEventListener("click", () =>
+      requestCaptureNow(button.dataset.deviceId, button),
+    );
+  });
   iconRefresh();
 }
 
@@ -478,8 +502,15 @@ function populateDeviceSelects() {
   $("#upload-device").innerHTML = options;
   $("#calibration-device-select").innerHTML = options;
   $("#capture-device-filter").innerHTML = `<option value="">All devices</option>${options}`;
+  $("#live-device-select").innerHTML = options;
   if (state.selectedDeviceId) {
     $("#calibration-device-select").value = state.selectedDeviceId;
+  }
+  if (!state.liveDeviceId && state.devices.length) {
+    state.liveDeviceId = state.devices[0].id;
+  }
+  if (state.liveDeviceId) {
+    $("#live-device-select").value = state.liveDeviceId;
   }
 }
 
@@ -499,7 +530,18 @@ function renderCalibration() {
   $("#calibration-status").innerHTML = `
     <div><span>Device</span><strong>${escapeHtml(data.device_id)}</strong></div>
     <div><span>Profile</span><strong>${escapeHtml(data.calibration_id)}</strong></div>
-    <div><span>Interval</span><strong>${data.capture_interval_minutes} min</strong></div>
+    <div>
+      <span>Interval</span>
+      <div class="calibration-interval-control">
+        <input id="capture-interval-input" type="number" min="10" max="30"
+          step="1" value="${data.capture_interval_minutes}" aria-label="Capture interval in minutes">
+        <span>min</span>
+        <button class="icon-button" id="save-capture-interval" type="button"
+          title="Save capture interval">
+          <i data-lucide="save"></i>
+        </button>
+      </div>
+    </div>
     <div><span>State</span><strong>${profile.locked ? "Locked" : "Editable"}</strong></div>
   `;
   $("#rgb-profile").innerHTML = cameraProfileMarkup(profile.cameras.rgb, profile.resolution);
@@ -527,7 +569,251 @@ function renderCalibration() {
       <div class="endpoint-row"><span>Content type</span><code>${escapeHtml(data.ingest.content_type)}</code></div>
     </div>
   `;
+  $("#save-capture-interval").addEventListener("click", saveCaptureInterval);
   iconRefresh();
+}
+
+async function saveCaptureInterval() {
+  if (!state.calibration) return;
+  const input = $("#capture-interval-input");
+  const interval = Number(input.value);
+  if (!Number.isInteger(interval) || interval < 10 || interval > 30) {
+    showToast("Interval must be from 10 to 30 minutes.");
+    input.focus();
+    return;
+  }
+  const button = $("#save-capture-interval");
+  button.disabled = true;
+  try {
+    state.calibration = await api(
+      `/api/devices/${encodeURIComponent(state.calibration.device_id)}/capture-profile`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          calibration_id: state.calibration.calibration_id,
+          capture_interval_minutes: interval,
+          profile: state.calibration.profile,
+        }),
+      },
+    );
+    renderCalibration();
+    showToast(`Capture interval updated to ${interval} minutes.`);
+    await refreshAll();
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    if (document.body.contains(button)) button.disabled = false;
+  }
+}
+
+async function requestCaptureNow(deviceId, button = null) {
+  if (!deviceId) return;
+  if (button) button.disabled = true;
+  try {
+    await api(`/api/devices/${encodeURIComponent(deviceId)}/commands`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "capture_now",
+        payload: { requested_from: "dashboard" },
+      }),
+    });
+    showToast("Capture command queued.");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    if (button) button.disabled = false;
+    iconRefresh();
+  }
+}
+
+function setFieldCaptureButton(active) {
+  const button = $("#device-capture-pair");
+  button.disabled = active;
+  button.innerHTML = active
+    ? `<i data-lucide="loader-circle"></i> Capture in progress`
+    : `<i data-lucide="camera"></i> Capture RGB + NIR`;
+  iconRefresh();
+}
+
+function renderFieldCaptureCommand(command) {
+  state.fieldCaptureCommand = command;
+  const section = $("#field-capture-section");
+  const result = $("#field-capture-result");
+  const progress = $("#field-command-progress");
+  const badge = $("#field-command-badge");
+  const title = $("#field-command-title");
+  const detail = $("#field-command-detail");
+  section.classList.remove("is-hidden");
+  result.classList.add("is-hidden");
+  progress.classList.remove("is-hidden");
+  badge.className = `status-badge command-${command.status}`;
+  badge.textContent = command.status;
+
+  const copy = {
+    pending: [
+      "Capture command queued",
+      "Waiting for the Raspberry Pi agent",
+    ],
+    running: [
+      "Capturing RGB + NIR",
+      "The node is validating and uploading the full-resolution pair",
+    ],
+    completed: [
+      "Capture stored",
+      "Loading the accepted observation and NDVI result",
+    ],
+    failed: [
+      "Capture failed",
+      command.result?.message || "The device could not complete this capture",
+    ],
+  }[command.status] || ["Capture status", command.status];
+  title.textContent = copy[0];
+  detail.textContent = copy[1];
+  setFieldCaptureButton(["pending", "running"].includes(command.status));
+  iconRefresh();
+}
+
+function renderFieldCaptureResult(capture) {
+  state.fieldCaptureResult = capture;
+  $("#field-capture-section").classList.remove("is-hidden");
+  $("#field-command-progress").classList.add("is-hidden");
+  $("#field-capture-result").classList.remove("is-hidden");
+  const badge = $("#field-command-badge");
+  badge.className = "status-badge command-completed";
+  badge.textContent = "stored";
+
+  const assets = [
+    ["rgb", "RGB", capture.assets.rgb_thumb || capture.assets.rgb],
+    ["nir", "NIR", capture.assets.nir_thumb || capture.assets.nir],
+    ["ndvi", "NDVI", capture.assets.ndvi_thumb || capture.assets.ndvi],
+  ];
+  $("#field-result-assets").innerHTML = assets
+    .map(
+      ([key, label, source]) => `
+        <button class="field-result-asset" type="button"
+          data-result-asset="${key}" title="Open ${label} observation">
+          <img src="${escapeHtml(source)}" alt="${label} full-resolution capture result">
+          <span>${label}</span>
+        </button>
+      `,
+    )
+    .join("");
+  $("#field-result-time").textContent =
+    `${dateLabel(capture.captured_at, { year: true })}, ${timeLabel(capture.captured_at)}`;
+  $("#field-result-ndvi").textContent = ndvi(capture.ndvi.mean);
+  $("#field-result-healthy").textContent = percent(capture.ndvi.healthy_fraction);
+  $("#field-result-delta").textContent =
+    capture.sync_delta_ms === null
+      ? "-"
+      : `${Number(capture.sync_delta_ms).toFixed(1)} ms`;
+  $$(".field-result-asset").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await openCapture(capture.id);
+      state.selectedAsset = button.dataset.resultAsset;
+      renderCaptureAsset();
+    });
+  });
+  setFieldCaptureButton(false);
+  iconRefresh();
+}
+
+function clearFieldCaptureState() {
+  window.clearInterval(state.fieldCapturePoll);
+  state.fieldCapturePoll = null;
+  state.fieldCaptureCommand = null;
+  state.fieldCaptureResult = null;
+  $("#field-capture-section").classList.add("is-hidden");
+  $("#field-capture-result").classList.add("is-hidden");
+  $("#field-command-progress").classList.remove("is-hidden");
+  setFieldCaptureButton(false);
+}
+
+async function pollFieldCaptureCommand() {
+  const command = state.fieldCaptureCommand;
+  if (!command || !state.liveDeviceId) return;
+  try {
+    const updated = await api(
+      `/api/devices/${encodeURIComponent(command.device_id)}/commands/${encodeURIComponent(command.id)}`,
+    );
+    renderFieldCaptureCommand(updated);
+    if (updated.status === "completed") {
+      window.clearInterval(state.fieldCapturePoll);
+      state.fieldCapturePoll = null;
+      const captureId = updated.result?.capture_id;
+      if (!captureId) {
+        throw new Error("Capture completed without a stored observation ID");
+      }
+      const capture = await api(`/api/captures/${encodeURIComponent(captureId)}`);
+      renderFieldCaptureResult(capture);
+      showToast("RGB, NIR, and NDVI were stored.");
+      await refreshAll();
+    } else if (updated.status === "failed") {
+      window.clearInterval(state.fieldCapturePoll);
+      state.fieldCapturePoll = null;
+      setFieldCaptureButton(false);
+      showToast(updated.result?.message || "Remote capture failed.");
+    }
+  } catch (error) {
+    $("#field-command-detail").textContent = error.message;
+  }
+}
+
+function watchFieldCaptureCommand(command) {
+  window.clearInterval(state.fieldCapturePoll);
+  renderFieldCaptureCommand(command);
+  if (!["pending", "running"].includes(command.status)) return;
+  state.fieldCapturePoll = window.setInterval(pollFieldCaptureCommand, 1500);
+}
+
+async function requestFieldCapture() {
+  if (!state.liveDeviceId) return;
+  clearFieldCaptureState();
+  setFieldCaptureButton(true);
+  try {
+    const command = await api(
+      `/api/devices/${encodeURIComponent(state.liveDeviceId)}/commands`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "capture_now",
+          payload: { requested_from: "live_field_preview" },
+        }),
+      },
+    );
+    watchFieldCaptureCommand(command);
+    showToast("Full-resolution capture queued.");
+  } catch (error) {
+    setFieldCaptureButton(false);
+    showToast(error.message);
+  }
+}
+
+async function loadFieldCaptureState() {
+  if (!state.liveDeviceId || state.liveSource !== "device") return;
+  try {
+    const commands = await api(
+      `/api/devices/${encodeURIComponent(state.liveDeviceId)}/commands?limit=10`,
+    );
+    const command = commands.find((item) => item.type === "capture_now");
+    if (!command) {
+      clearFieldCaptureState();
+      return;
+    }
+    renderFieldCaptureCommand(command);
+    if (["pending", "running"].includes(command.status)) {
+      watchFieldCaptureCommand(command);
+    } else if (command.status === "completed" && command.result?.capture_id) {
+      const capture = await api(
+        `/api/captures/${encodeURIComponent(command.result.capture_id)}`,
+      );
+      renderFieldCaptureResult(capture);
+    }
+  } catch (_error) {
+    clearFieldCaptureState();
+  }
 }
 
 function cameraProfileMarkup(camera, resolution) {
@@ -674,7 +960,458 @@ async function recomputeNdvi() {
   }
 }
 
+function setDevicePreviewConnection(status, label) {
+  const connection = $("#device-preview-connection");
+  const dot = $(".status-dot", connection);
+  dot.classList.toggle("is-online", status === "online");
+  dot.classList.toggle("is-offline", status === "offline");
+  $("span:last-child", connection).textContent = label;
+}
+
+function resetDevicePreviewImages() {
+  state.devicePreviewSequence = null;
+  ["rgb", "nir"].forEach((channel) => {
+    const image = $(`#device-${channel}-preview`);
+    const placeholder = $(`#device-${channel}-placeholder`);
+    image.removeAttribute("src");
+    image.classList.remove("is-visible");
+    placeholder.classList.remove("is-hidden");
+  });
+}
+
+function renderDevicePreview() {
+  const preview = state.devicePreview;
+  if (!preview) return;
+  $("#device-preview-name").textContent =
+    `${preview.device_name} / ${preview.site_name}`;
+  $("#device-preview-state").textContent =
+    preview.state === "streaming"
+      ? "Streaming"
+      : preview.state === "waiting"
+        ? "Waiting for Pi"
+        : "Stopped";
+  $("#device-preview-resolution").textContent = preview.resolution
+    ? `${preview.resolution.width} x ${preview.resolution.height}`
+    : "-";
+  $("#device-rgb-sharpness").textContent = preview.quality
+    ? Number(preview.quality.rgb_blur_score).toFixed(1)
+    : "-";
+  $("#device-nir-sharpness").textContent = preview.quality
+    ? Number(preview.quality.nir_blur_score).toFixed(1)
+    : "-";
+  $("#device-preview-delta").textContent =
+    preview.sync_delta_ms === null
+      ? "-"
+      : `${Number(preview.sync_delta_ms).toFixed(1)} ms`;
+  $("#device-preview-sequence").textContent = String(preview.sequence || 0);
+  $("#device-preview-cadence").textContent =
+    `One paired frame every ${Number(preview.interval_seconds).toFixed(0)} seconds`;
+  $("#device-preview-age").textContent = preview.latest_at
+    ? `Updated ${relativeTime(preview.latest_at).toLowerCase()}`
+    : "Waiting for first frame";
+
+  if (preview.state === "streaming") {
+    setDevicePreviewConnection("online", "RGB + NIR live");
+  } else if (preview.active) {
+    setDevicePreviewConnection("idle", "Waiting for Pi agent");
+  } else {
+    setDevicePreviewConnection("offline", "Preview stopped");
+  }
+
+  const version = `${preview.session_id || "none"}-${preview.sequence || 0}`;
+  if (
+    preview.sequence > 0
+    && preview.assets.rgb
+    && preview.assets.nir
+    && state.devicePreviewSequence !== version
+  ) {
+    state.devicePreviewSequence = version;
+    [
+      ["rgb", preview.assets.rgb],
+      ["nir", preview.assets.nir],
+    ].forEach(([channel, asset]) => {
+      const image = $(`#device-${channel}-preview`);
+      const placeholder = $(`#device-${channel}-placeholder`);
+      image.src = `${asset}?v=${encodeURIComponent(version)}`;
+      image.decode()
+        .then(() => {
+          image.classList.add("is-visible");
+          placeholder.classList.add("is-hidden");
+        })
+        .catch(() => {});
+    });
+  } else if (preview.sequence === 0 && state.devicePreviewSequence !== null) {
+    resetDevicePreviewImages();
+  }
+}
+
+async function refreshDevicePreview() {
+  if (
+    state.currentView !== "live"
+    || state.liveSource !== "device"
+    || !state.liveDeviceId
+  ) {
+    return;
+  }
+  try {
+    state.devicePreview = await api(
+      `/api/devices/${encodeURIComponent(state.liveDeviceId)}/preview`,
+    );
+    renderDevicePreview();
+  } catch (error) {
+    setDevicePreviewConnection("offline", "Preview unavailable");
+  }
+}
+
+async function startDevicePreview() {
+  if (!state.liveDeviceId) return;
+  window.clearInterval(state.devicePreviewPoll);
+  window.clearInterval(state.devicePreviewKeepalive);
+  try {
+    state.devicePreview = await api(
+      `/api/devices/${encodeURIComponent(state.liveDeviceId)}/preview/start`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          interval_seconds: 2,
+          preview_width: 960,
+          session_seconds: 90,
+        }),
+      },
+    );
+    renderDevicePreview();
+    state.devicePreviewPoll = window.setInterval(refreshDevicePreview, 1000);
+    state.devicePreviewKeepalive = window.setInterval(async () => {
+      if (
+        state.currentView !== "live"
+        || state.liveSource !== "device"
+        || !state.liveDeviceId
+      ) {
+        return;
+      }
+      try {
+        state.devicePreview = await api(
+          `/api/devices/${encodeURIComponent(state.liveDeviceId)}/preview/start`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              interval_seconds: 2,
+              preview_width: 960,
+              session_seconds: 90,
+            }),
+          },
+        );
+        renderDevicePreview();
+      } catch (_error) {
+        setDevicePreviewConnection("offline", "Preview unavailable");
+      }
+    }, 45000);
+  } catch (error) {
+    setDevicePreviewConnection("offline", "Preview unavailable");
+    showToast(error.message);
+  }
+}
+
+async function stopDevicePreview(deviceId = state.liveDeviceId) {
+  window.clearInterval(state.devicePreviewPoll);
+  window.clearInterval(state.devicePreviewKeepalive);
+  state.devicePreviewPoll = null;
+  state.devicePreviewKeepalive = null;
+  resetDevicePreviewImages();
+  if (!deviceId) return;
+  try {
+    await api(`/api/devices/${encodeURIComponent(deviceId)}/preview/stop`, {
+      method: "POST",
+    });
+  } catch (_error) {
+    // Preview sessions expire automatically if the browser disconnects.
+  }
+}
+
+async function restartDevicePreview() {
+  const button = $("#device-preview-restart");
+  button.disabled = true;
+  button.classList.add("is-active");
+  try {
+    await stopDevicePreview();
+    await startDevicePreview();
+  } finally {
+    button.disabled = false;
+    button.classList.remove("is-active");
+    iconRefresh();
+  }
+}
+
+function openLiveView() {
+  if (state.liveSource === "device") {
+    startDevicePreview();
+  } else {
+    openWebcamView();
+  }
+}
+
+function closeLiveView() {
+  if (state.liveSource === "device") {
+    stopDevicePreview();
+  } else {
+    closeWebcamView();
+  }
+}
+
+async function switchLiveSource(source) {
+  if (!["device", "webcam"].includes(source) || source === state.liveSource) {
+    return;
+  }
+  if (state.currentView === "live") {
+    if (state.liveSource === "device") {
+      await stopDevicePreview();
+    } else {
+      closeWebcamView();
+    }
+  }
+  state.liveSource = source;
+  $$("[data-live-source]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.liveSource === source);
+  });
+  $("#device-live-actions").classList.toggle("is-hidden", source !== "device");
+  $("#device-live-panel").classList.toggle("is-hidden", source !== "device");
+  $("#webcam-live-actions").classList.toggle("is-hidden", source !== "webcam");
+  $("#webcam-live-panel").classList.toggle("is-hidden", source !== "webcam");
+  $("#live-view-title").textContent =
+    source === "device" ? "Field camera preview" : "USB RGB test camera";
+  if (state.currentView === "live") openLiveView();
+  iconRefresh();
+}
+
+function setWebcamConnection(status, label) {
+  const connection = $("#webcam-connection");
+  const dot = $(".status-dot", connection);
+  dot.classList.toggle("is-online", status === "online");
+  dot.classList.toggle("is-offline", status === "offline");
+  $("span:last-child", connection).textContent = label;
+}
+
+function renderWebcamStatus() {
+  const status = state.webcamStatus;
+  if (!status) return;
+
+  const configured = status.configured;
+  const active = status.active;
+  const frame = status.frame;
+  $("#webcam-name").textContent = status.camera_name;
+  $("#webcam-resolution").value = `${configured.width}x${configured.height}`;
+  $("#webcam-fps").value = String(configured.fps);
+  $("#webcam-zoom").value = String(configured.zoom);
+  $("#webcam-zoom-value").value = `${Number(configured.zoom).toFixed(1)}x`;
+  $("#webcam-active-mode").textContent = `${active.width} x ${active.height}`;
+  $("#webcam-active-fps").textContent = `${Number(active.fps).toFixed(0)} FPS`;
+  $("#webcam-brightness").textContent = frame ? percent(frame.brightness) : "-";
+  $("#webcam-sharpness").textContent = frame
+    ? Number(frame.sharpness).toFixed(1)
+    : "-";
+  $("#webcam-dark-fraction").textContent = frame
+    ? percent(frame.dark_fraction, 1)
+    : "-";
+  $("#webcam-saturation").textContent = frame
+    ? percent(frame.saturated_fraction, 1)
+    : "-";
+
+  if (status.running) {
+    setWebcamConnection("online", "Camera live");
+  } else if (status.error) {
+    setWebcamConnection("offline", "Camera unavailable");
+  } else {
+    setWebcamConnection("idle", "Camera idle");
+  }
+}
+
+function renderWebcamSnapshots() {
+  const snapshots = state.webcamSnapshots;
+  $("#webcam-snapshot-count").textContent =
+    `${snapshots.length} saved`;
+  if (!snapshots.length) {
+    $("#webcam-snapshots").innerHTML = `
+      <div class="empty-state webcam-empty">
+        No RGB snapshots have been captured yet.
+      </div>
+    `;
+    return;
+  }
+
+  const groups = new Map();
+  snapshots.forEach((snapshot) => {
+    if (!groups.has(snapshot.date_key)) groups.set(snapshot.date_key, []);
+    groups.get(snapshot.date_key).push(snapshot);
+  });
+  $("#webcam-snapshots").innerHTML = Array.from(groups.entries())
+    .map(
+      ([dateKey, items]) => `
+        <section class="webcam-date-group">
+          <div class="webcam-date-heading">
+            <h3>${escapeHtml(dateLabel(`${dateKey}T00:00:00Z`, { year: true }))}</h3>
+            <span>${items.length} RGB image${items.length === 1 ? "" : "s"}</span>
+          </div>
+          <div class="webcam-date-grid">
+            ${items
+              .map(
+                (snapshot) => `
+                  <article class="webcam-snapshot-card">
+                    <a href="${escapeHtml(snapshot.assets.rgb)}" target="_blank"
+                      rel="noopener" title="Open full RGB image">
+                      <img src="${escapeHtml(snapshot.assets.thumb)}"
+                        alt="RGB snapshot captured at ${escapeHtml(timeLabel(snapshot.captured_at))}">
+                    </a>
+                    <div class="webcam-snapshot-meta">
+                      <div>
+                        <strong>${escapeHtml(timeLabel(snapshot.captured_at))}</strong>
+                        <span>${snapshot.resolution.width} x ${snapshot.resolution.height}</span>
+                      </div>
+                      <div>
+                        <strong>${Number(snapshot.quality.blur_score).toFixed(0)}</strong>
+                        <span>Sharpness</span>
+                      </div>
+                      <a class="icon-button" href="${escapeHtml(snapshot.assets.rgb)}"
+                        download="${escapeHtml(`${snapshot.date_key}-${snapshot.id}-rgb.jpg`)}"
+                        title="Download RGB image">
+                        <i data-lucide="download"></i>
+                      </a>
+                    </div>
+                  </article>
+                `,
+              )
+              .join("")}
+          </div>
+        </section>
+      `,
+    )
+    .join("");
+  iconRefresh();
+}
+
+function startWebcamPreview() {
+  const image = $("#webcam-stream");
+  const placeholder = $("#webcam-placeholder");
+  placeholder.classList.remove("is-hidden");
+  $("#webcam-placeholder-detail").textContent = "Waiting for the USB camera";
+  image.classList.remove("is-visible");
+  image.src = `/api/webcam/stream.mjpg?t=${Date.now()}`;
+}
+
+async function refreshWebcamStatus() {
+  if (state.currentView !== "live" || state.liveSource !== "webcam") return;
+  try {
+    state.webcamStatus = await api("/api/webcam/status");
+    renderWebcamStatus();
+  } catch (error) {
+    setWebcamConnection("offline", "Camera unavailable");
+  }
+}
+
+async function loadWebcamSnapshots() {
+  try {
+    state.webcamSnapshots = await api("/api/webcam/snapshots?limit=48");
+    renderWebcamSnapshots();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function openWebcamView() {
+  window.clearInterval(state.webcamPoll);
+  try {
+    state.webcamStatus = await api("/api/webcam/start", { method: "POST" });
+    renderWebcamStatus();
+    startWebcamPreview();
+    await loadWebcamSnapshots();
+    state.webcamPoll = window.setInterval(refreshWebcamStatus, 2000);
+  } catch (error) {
+    setWebcamConnection("offline", "Camera unavailable");
+    $("#webcam-placeholder-detail").textContent = error.message;
+    showToast(error.message);
+  }
+}
+
+function closeWebcamView() {
+  window.clearInterval(state.webcamPoll);
+  state.webcamPoll = null;
+  const stream = $("#webcam-stream");
+  stream.removeAttribute("src");
+  stream.classList.remove("is-visible");
+  $("#webcam-placeholder").classList.remove("is-hidden");
+  api("/api/webcam/stop", { method: "POST" }).catch(() => {});
+}
+
+async function restartWebcamPreview() {
+  const button = $("#webcam-restart");
+  button.disabled = true;
+  button.classList.add("is-active");
+  try {
+    await api("/api/webcam/stop", { method: "POST" });
+    await openWebcamView();
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    button.disabled = false;
+    button.classList.remove("is-active");
+    iconRefresh();
+  }
+}
+
+async function updateWebcamConfig() {
+  const [width, height] = $("#webcam-resolution").value.split("x").map(Number);
+  const fps = Number($("#webcam-fps").value);
+  const zoom = Number($("#webcam-zoom").value);
+  $$(".camera-control select, .camera-control input").forEach((control) => {
+    control.disabled = true;
+  });
+  try {
+    state.webcamStatus = await api("/api/webcam/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ width, height, fps, zoom }),
+    });
+    renderWebcamStatus();
+    startWebcamPreview();
+    showToast(`Camera set to ${width} x ${height}, ${fps} FPS, ${zoom.toFixed(1)}x.`);
+  } catch (error) {
+    showToast(error.message);
+    await refreshWebcamStatus();
+  } finally {
+    $$(".camera-control select, .camera-control input").forEach((control) => {
+      control.disabled = false;
+    });
+  }
+}
+
+async function captureWebcamSnapshot() {
+  const button = $("#webcam-capture");
+  button.disabled = true;
+  button.innerHTML = `<i data-lucide="loader-circle"></i> Checking frame`;
+  iconRefresh();
+  try {
+    const snapshot = await api("/api/webcam/capture", { method: "POST" });
+    state.webcamSnapshots = [
+      snapshot,
+      ...state.webcamSnapshots.filter((item) => item.id !== snapshot.id),
+    ].slice(0, 48);
+    renderWebcamSnapshots();
+    showToast("RGB snapshot passed quality checks and was saved.");
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    button.disabled = false;
+    button.innerHTML = `<i data-lucide="camera"></i> Capture RGB`;
+    iconRefresh();
+  }
+}
+
 function switchView(view) {
+  if (state.currentView === "live" && view !== "live") {
+    closeLiveView();
+  }
+  state.currentView = view;
   $$(".app-view").forEach((section) => {
     section.classList.toggle("is-active", section.id === `view-${view}`);
   });
@@ -686,6 +1423,7 @@ function switchView(view) {
     $("#calibration-device-select").value = state.selectedDeviceId;
     loadCalibration(state.selectedDeviceId);
   }
+  if (view === "live") openLiveView();
   window.scrollTo({ top: 0, behavior: "instant" });
   iconRefresh();
 }
@@ -775,6 +1513,63 @@ function bindEvents() {
     loadCalibration(state.selectedDeviceId);
   });
   $("#export-profile").addEventListener("click", exportProfile);
+  $("#calibration-capture-now").addEventListener("click", (event) =>
+    requestCaptureNow(state.selectedDeviceId, event.currentTarget),
+  );
+  $$("[data-live-source]").forEach((button) => {
+    button.addEventListener("click", () =>
+      switchLiveSource(button.dataset.liveSource),
+    );
+  });
+  $("#live-device-select").addEventListener("change", async (event) => {
+    const previousDeviceId = state.liveDeviceId;
+    if (
+      state.currentView === "live"
+      && state.liveSource === "device"
+      && previousDeviceId
+    ) {
+      await stopDevicePreview(previousDeviceId);
+    }
+    state.liveDeviceId = event.target.value;
+    state.devicePreview = null;
+    resetDevicePreviewImages();
+    if (state.currentView === "live" && state.liveSource === "device") {
+      await startDevicePreview();
+    }
+  });
+  $("#device-preview-restart").addEventListener("click", restartDevicePreview);
+  $("#device-capture-pair").addEventListener("click", (event) =>
+    requestCaptureNow(state.liveDeviceId, event.currentTarget),
+  );
+  $("#webcam-restart").addEventListener("click", restartWebcamPreview);
+  $("#webcam-capture").addEventListener("click", captureWebcamSnapshot);
+  $("#webcam-resolution").addEventListener("change", updateWebcamConfig);
+  $("#webcam-fps").addEventListener("change", updateWebcamConfig);
+  $("#webcam-zoom").addEventListener("input", (event) => {
+    $("#webcam-zoom-value").value = `${Number(event.target.value).toFixed(1)}x`;
+  });
+  $("#webcam-zoom").addEventListener("change", updateWebcamConfig);
+  $("#webcam-stream").addEventListener("load", () => {
+    $("#webcam-stream").classList.add("is-visible");
+    $("#webcam-placeholder").classList.add("is-hidden");
+  });
+  $("#webcam-stream").addEventListener("error", () => {
+    $("#webcam-stream").classList.remove("is-visible");
+    $("#webcam-placeholder").classList.remove("is-hidden");
+    $("#webcam-placeholder-detail").textContent = "Preview connection was interrupted";
+  });
+  ["rgb", "nir"].forEach((channel) => {
+    const image = $(`#device-${channel}-preview`);
+    const placeholder = $(`#device-${channel}-placeholder`);
+    image.addEventListener("load", () => {
+      image.classList.add("is-visible");
+      placeholder.classList.add("is-hidden");
+    });
+    image.addEventListener("error", () => {
+      image.classList.remove("is-visible");
+      placeholder.classList.remove("is-hidden");
+    });
+  });
   $$("[data-close-dialog]").forEach((button) => {
     button.addEventListener("click", () => {
       document.getElementById(button.dataset.closeDialog).close();
@@ -797,6 +1592,17 @@ function bindEvents() {
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) dialog.close();
     });
+  });
+  window.addEventListener("pagehide", () => {
+    if (state.currentView !== "live") return;
+    if (state.liveSource === "device" && state.liveDeviceId) {
+      navigator.sendBeacon(
+        `/api/devices/${encodeURIComponent(state.liveDeviceId)}/preview/stop`,
+      );
+    } else {
+      $("#webcam-stream").removeAttribute("src");
+      navigator.sendBeacon("/api/webcam/stop");
+    }
   });
 }
 

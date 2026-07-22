@@ -28,6 +28,10 @@
             <i data-lucide="layout-dashboard"></i>
             <span>Dashboard</span>
           </button>
+          <button class="nav-tab" type="button" data-view-target="live">
+            <i data-lucide="video"></i>
+            <span>Live</span>
+          </button>
           <button class="nav-tab" type="button" data-view-target="captures">
             <i data-lucide="images"></i>
             <span>Captures</span>
@@ -164,6 +168,285 @@
           </section>
         </section>
 
+        <section class="app-view" id="view-live">
+          <div class="view-heading">
+            <div>
+              <span class="eyebrow">Camera control</span>
+              <h1 id="live-view-title">Field camera preview</h1>
+            </div>
+            <div class="live-source-switch" aria-label="Live camera source">
+              <button class="is-active" type="button" data-live-source="device">
+                <i data-lucide="radio-tower"></i>
+                Field cameras
+              </button>
+              <button type="button" data-live-source="webcam">
+                <i data-lucide="webcam"></i>
+                USB test
+              </button>
+            </div>
+          </div>
+
+          <div class="live-action-bar">
+            <div class="live-source-actions" id="device-live-actions">
+              <label class="live-device-select">
+                <span>Field node</span>
+                <select id="live-device-select"></select>
+              </label>
+              <div class="camera-connection" id="device-preview-connection">
+                <span class="status-dot"></span>
+                <span>Preview stopped</span>
+              </div>
+              <button class="icon-button" id="device-preview-restart" type="button" title="Restart field preview">
+                <i data-lucide="refresh-cw"></i>
+              </button>
+              <button class="button button-primary" id="device-capture-pair" type="button">
+                <i data-lucide="camera"></i>
+                Capture RGB + NIR
+              </button>
+            </div>
+
+            <div class="live-source-actions is-hidden" id="webcam-live-actions">
+              <div class="camera-connection" id="webcam-connection">
+                <span class="status-dot"></span>
+                <span>Camera idle</span>
+              </div>
+              <button class="icon-button" id="webcam-restart" type="button" title="Restart preview">
+                <i data-lucide="refresh-cw"></i>
+              </button>
+              <button class="button button-primary" id="webcam-capture" type="button">
+                <i data-lucide="camera"></i>
+                Capture RGB
+              </button>
+            </div>
+          </div>
+
+          <div id="device-live-panel">
+            <div class="field-preview-layout">
+              <section class="field-preview-workspace">
+                <div class="field-preview-grid">
+                  <div class="field-preview-stage">
+                    <img id="device-rgb-preview" alt="Remote Raspberry Pi RGB camera preview">
+                    <div class="preview-placeholder" id="device-rgb-placeholder">
+                      <i data-lucide="image"></i>
+                      <strong>Waiting for RGB</strong>
+                      <span>The Pi agent will upload the next preview pair</span>
+                    </div>
+                    <div class="preview-channel-label">
+                      <span class="live-indicator"></span>
+                      RGB
+                    </div>
+                  </div>
+                  <div class="field-preview-stage nir-preview-stage">
+                    <img id="device-nir-preview" alt="Remote Raspberry Pi NIR camera preview">
+                    <div class="preview-placeholder" id="device-nir-placeholder">
+                      <i data-lucide="scan"></i>
+                      <strong>Waiting for NIR</strong>
+                      <span>The Pi agent will upload the next preview pair</span>
+                    </div>
+                    <div class="preview-channel-label">
+                      <span class="live-indicator"></span>
+                      NIR
+                    </div>
+                  </div>
+                </div>
+                <div class="field-preview-footer">
+                  <span><i data-lucide="cloud"></i>Cloud relay</span>
+                  <span id="device-preview-cadence">One paired frame every 2 seconds</span>
+                  <span id="device-preview-age">Waiting for first frame</span>
+                </div>
+              </section>
+
+              <aside class="camera-telemetry field-telemetry">
+                <div class="telemetry-heading">
+                  <div>
+                    <span class="eyebrow">Raspberry Pi node</span>
+                    <h2 id="device-preview-name">Field camera pair</h2>
+                  </div>
+                  <span class="channel-tag pair-channel">PAIR</span>
+                </div>
+
+                <div class="telemetry-grid">
+                  <div>
+                    <span>Preview state</span>
+                    <strong id="device-preview-state">Waiting</strong>
+                  </div>
+                  <div>
+                    <span>Resolution</span>
+                    <strong id="device-preview-resolution">-</strong>
+                  </div>
+                  <div>
+                    <span>RGB sharpness</span>
+                    <strong id="device-rgb-sharpness">-</strong>
+                  </div>
+                  <div>
+                    <span>NIR sharpness</span>
+                    <strong id="device-nir-sharpness">-</strong>
+                  </div>
+                  <div>
+                    <span>Pair delta</span>
+                    <strong id="device-preview-delta">-</strong>
+                  </div>
+                  <div>
+                    <span>Sequence</span>
+                    <strong id="device-preview-sequence">0</strong>
+                  </div>
+                </div>
+
+                <div class="camera-scope-note">
+                  <i data-lucide="info"></i>
+                  <span>Preview frames are temporary. Capture RGB + NIR stores the calibrated full-resolution pair and generates NDVI.</span>
+                </div>
+              </aside>
+            </div>
+
+            <section class="field-capture-section is-hidden" id="field-capture-section">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Permanent observation</span>
+                  <h2>Latest full-resolution capture</h2>
+                </div>
+                <span class="status-badge command-pending" id="field-command-badge">Queued</span>
+              </div>
+
+              <div class="field-command-progress" id="field-command-progress">
+                <i data-lucide="loader-circle"></i>
+                <div>
+                  <strong id="field-command-title">Capture command queued</strong>
+                  <span id="field-command-detail">Waiting for the Raspberry Pi agent</span>
+                </div>
+              </div>
+
+              <div class="field-capture-result is-hidden" id="field-capture-result">
+                <div class="field-result-assets" id="field-result-assets"></div>
+                <div class="field-result-summary">
+                  <div>
+                    <span>Captured</span>
+                    <strong id="field-result-time">-</strong>
+                  </div>
+                  <div>
+                    <span>Mean NDVI</span>
+                    <strong id="field-result-ndvi">-</strong>
+                  </div>
+                  <div>
+                    <span>Healthy canopy</span>
+                    <strong id="field-result-healthy">-</strong>
+                  </div>
+                  <div>
+                    <span>Pair delta</span>
+                    <strong id="field-result-delta">-</strong>
+                  </div>
+                  <button class="button button-secondary" id="field-result-open" type="button">
+                    <i data-lucide="expand"></i>
+                    Open observation
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="is-hidden" id="webcam-live-panel">
+            <div class="live-camera-layout">
+              <section class="live-camera-workspace">
+                <div class="live-preview-stage">
+                  <img id="webcam-stream" alt="Live RGB camera preview">
+                  <div class="preview-placeholder" id="webcam-placeholder">
+                    <i data-lucide="video-off"></i>
+                    <strong>Preview is starting</strong>
+                    <span id="webcam-placeholder-detail">Waiting for the USB camera</span>
+                  </div>
+                  <div class="preview-channel-label">
+                    <span class="live-indicator"></span>
+                    RGB only
+                  </div>
+                </div>
+
+                <div class="camera-control-bar">
+                  <label class="camera-control">
+                    <span>Resolution</span>
+                    <select id="webcam-resolution">
+                      <option value="640x480">640 x 480</option>
+                      <option value="1280x720">1280 x 720</option>
+                      <option value="1920x1080">1920 x 1080</option>
+                    </select>
+                  </label>
+                  <label class="camera-control">
+                    <span>Frame rate</span>
+                    <select id="webcam-fps">
+                      <option value="10">10 FPS</option>
+                      <option value="15">15 FPS</option>
+                      <option value="30">30 FPS</option>
+                    </select>
+                  </label>
+                  <label class="camera-control zoom-control">
+                    <span>Digital zoom <output id="webcam-zoom-value">1.0x</output></span>
+                    <input
+                      id="webcam-zoom"
+                      type="range"
+                      min="1"
+                      max="3"
+                      step="0.1"
+                      value="1"
+                    >
+                  </label>
+                </div>
+              </section>
+
+              <aside class="camera-telemetry">
+                <div class="telemetry-heading">
+                  <div>
+                    <span class="eyebrow">RGB sensor</span>
+                    <h2 id="webcam-name">USB RGB camera</h2>
+                  </div>
+                  <span class="channel-tag rgb-channel">RGB</span>
+                </div>
+
+                <div class="telemetry-grid">
+                  <div>
+                    <span>Active mode</span>
+                    <strong id="webcam-active-mode">-</strong>
+                  </div>
+                  <div>
+                    <span>Frame rate</span>
+                    <strong id="webcam-active-fps">-</strong>
+                  </div>
+                  <div>
+                    <span>Brightness</span>
+                    <strong id="webcam-brightness">-</strong>
+                  </div>
+                  <div>
+                    <span>Sharpness</span>
+                    <strong id="webcam-sharpness">-</strong>
+                  </div>
+                  <div>
+                    <span>Dark pixels</span>
+                    <strong id="webcam-dark-fraction">-</strong>
+                  </div>
+                  <div>
+                    <span>Saturated</span>
+                    <strong id="webcam-saturation">-</strong>
+                  </div>
+                </div>
+
+                <div class="camera-scope-note">
+                  <i data-lucide="info"></i>
+                  <span>Saved as RGB observations. NIR and NDVI are not generated from this test camera.</span>
+                </div>
+              </aside>
+            </div>
+
+            <section class="webcam-snapshot-section">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">Local archive</span>
+                  <h2>Recent RGB snapshots</h2>
+                </div>
+                <span class="snapshot-count" id="webcam-snapshot-count">0 saved</span>
+              </div>
+              <div class="webcam-snapshot-grid" id="webcam-snapshots"></div>
+            </section>
+          </div>
+        </section>
+
         <section class="app-view" id="view-captures">
           <div class="view-heading">
             <div>
@@ -247,6 +530,10 @@
             </div>
             <div class="heading-actions">
               <select class="sharp-select" id="calibration-device-select"></select>
+              <button class="button button-primary" id="calibration-capture-now" type="button">
+                <i data-lucide="camera"></i>
+                Capture now
+              </button>
               <button class="button button-secondary" id="export-profile" type="button">
                 <i data-lucide="download"></i>
                 Export JSON

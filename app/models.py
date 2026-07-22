@@ -84,3 +84,74 @@ class Capture(Base):
 
     device: Mapped[Device] = relationship(back_populates="captures")
 
+
+class DeviceCommand(Base):
+    __tablename__ = "device_commands"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    device_id: Mapped[str] = mapped_column(ForeignKey("devices.id"), index=True)
+    command_type: Mapped[str] = mapped_column(String(40), index=True)
+    status: Mapped[str] = mapped_column(String(30), default="pending", index=True)
+    payload_json: Mapped[str] = mapped_column(Text, default="{}")
+    result_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class WebcamSnapshot(Base):
+    __tablename__ = "webcam_snapshots"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    date_key: Mapped[str] = mapped_column(String(10), index=True)
+    image_key: Mapped[str] = mapped_column(Text, nullable=False)
+    thumb_key: Mapped[str] = mapped_column(Text, nullable=False)
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    fps: Mapped[float] = mapped_column(Float)
+    zoom: Mapped[float] = mapped_column(Float)
+    blur_score: Mapped[float] = mapped_column(Float)
+    mean_normalized: Mapped[float] = mapped_column(Float)
+    dark_fraction: Mapped[float] = mapped_column(Float)
+    saturated_fraction: Mapped[float] = mapped_column(Float)
+    camera_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class DevicePreview(Base):
+    __tablename__ = "device_previews"
+
+    device_id: Mapped[str] = mapped_column(
+        ForeignKey("devices.id"),
+        primary_key=True,
+    )
+    session_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    requested_until: Mapped[datetime] = mapped_column(DateTime, index=True)
+    interval_seconds: Mapped[float] = mapped_column(Float, default=2.0)
+    preview_width: Mapped[int] = mapped_column(Integer, default=960)
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    latest_session_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    latest_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    rgb_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    nir_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sync_delta_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rgb_blur_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    nir_blur_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rgb_mean: Mapped[float | None] = mapped_column(Float, nullable=True)
+    nir_mean: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rgb_saturated_fraction: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+    nir_saturated_fraction: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=utcnow,
+        onupdate=utcnow,
+    )

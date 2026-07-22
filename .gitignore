@@ -10,6 +10,7 @@ data/*.db
 data/media/*
 !data/media/.gitkeep
 data/test-*/
+data/device-queue/
 
 node_modules/
 playwright-report/
